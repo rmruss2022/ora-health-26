@@ -1,17 +1,28 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import authRoutes from './routes/auth.routes';
 import chatRoutes from './routes/chat.routes';
 import journalRoutes from './routes/journal.routes';
 import meditationRoutes from './routes/meditation.routes';
 import communityRoutes from './routes/community.routes';
 import inboxRoutes from './routes/inbox.routes';
+import commentRoutes from './routes/comment.routes';
+import profileRoutes from './routes/profile.routes';
+import letterRoutes from './routes/letter.routes';
+import reactionsRoutes from './routes/reactions.routes';
+// import analyticsRoutes from './routes/analytics.routes';
+// import backgroundRoutes from './routes/background.routes';
+// import notificationsRoutes from './routes/notifications.routes';
+import { scheduleDailyLetters } from './jobs/daily-letters.cron';
+import { WebSocketService } from './services/websocket.service';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -34,6 +45,13 @@ app.use('/journal', journalRoutes);
 app.use('/meditations', meditationRoutes);
 app.use('/community', communityRoutes);
 app.use('/inbox', inboxRoutes);
+app.use('/api', commentRoutes);
+app.use('/api/users', profileRoutes);
+app.use('/api/letters', letterRoutes);
+app.use('/api/reactions', reactionsRoutes);
+// app.use('/api/analytics', analyticsRoutes);
+// app.use('/api/background', backgroundRoutes);
+// app.use('/api/notifications', notificationsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -51,8 +69,18 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Initialize WebSocket server
+const webSocketService = new WebSocketService();
+webSocketService.initialize(httpServer);
+
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🦞 Ora AI API running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Start cron jobs
+  if (process.env.ENABLE_CRON_JOBS !== 'false') {
+    scheduleDailyLetters();
+    console.log('📬 Daily letter cron job scheduled');
+  }
 });

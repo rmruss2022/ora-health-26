@@ -4,3 +4,6 @@ dist/
 .DS_Store
 *.log
 npm-debug.log*
+../Ora 2
+populate-sample-data.ts
+create-chat-table.sql

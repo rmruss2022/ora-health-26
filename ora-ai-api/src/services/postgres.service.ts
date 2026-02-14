@@ -8,22 +8,28 @@ export class PostgresService {
     email: string;
     passwordHash: string;
     id?: string;
+    name?: string;
   }): Promise<void> {
     const userId = user.id || randomUUID();
+    const name = user.name || '';
     await query(
-      'INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)',
-      [userId, user.email, user.passwordHash]
+      'INSERT INTO users (id, email, password_hash, name) VALUES ($1, $2, $3, $4)',
+      [userId, user.email, user.passwordHash, name]
     );
   }
 
   async getUserById(userId: string): Promise<any | null> {
-    const result = await query('SELECT * FROM users WHERE id = $1', [userId]);
+    const result = await query('SELECT * FROM users WHERE id = $1 AND is_active = true', [userId]);
     return result.rows[0] || null;
   }
 
   async getUserByEmail(email: string): Promise<any | null> {
-    const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await query('SELECT * FROM users WHERE email = $1 AND is_active = true', [email]);
     return result.rows[0] || null;
+  }
+
+  async updateLastLogin(userId: string): Promise<void> {
+    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [userId]);
   }
 
   // ===== USER SUMMARIES (For Agent Context) =====

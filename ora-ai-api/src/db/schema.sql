@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS meditations (
 -- Meditation sessions (user progress tracking)
 CREATE TABLE IF NOT EXISTS meditation_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   meditation_id UUID NOT NULL REFERENCES meditations(id) ON DELETE CASCADE,
   started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMP,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS meditation_sessions (
 -- Community posts
 CREATE TABLE IF NOT EXISTS community_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   author_name VARCHAR(255),
   author_avatar VARCHAR(10),
   is_anonymous BOOLEAN DEFAULT false,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS community_posts (
 CREATE TABLE IF NOT EXISTS post_likes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(post_id, user_id)
 );
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS post_likes (
 CREATE TABLE IF NOT EXISTS post_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   author_name VARCHAR(255),
   author_avatar VARCHAR(10),
   is_anonymous BOOLEAN DEFAULT false,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS post_comments (
 -- User progress tracking
 CREATE TABLE IF NOT EXISTS user_progress (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   check_in_date DATE NOT NULL,
   mood VARCHAR(50),
   notes TEXT,

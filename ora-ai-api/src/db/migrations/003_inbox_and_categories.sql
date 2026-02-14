@@ -28,7 +28,7 @@ ON CONFLICT (id) DO NOTHING;
 -- ==========================================
 CREATE TABLE IF NOT EXISTS inbox_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   message_type VARCHAR(50) NOT NULL,
   subject VARCHAR(255),
   content TEXT NOT NULL,
@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_inbox_message_type ON inbox_messages(message_type
 CREATE TABLE IF NOT EXISTS inbox_message_responses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id UUID NOT NULL REFERENCES inbox_messages(id) ON DELETE CASCADE,
-  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   response_text TEXT NOT NULL,
   created_post_id UUID REFERENCES community_posts(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

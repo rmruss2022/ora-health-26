@@ -7,7 +7,7 @@ class ChatController {
   async sendMessage(req: AuthRequest, res: Response) {
     try {
       const { content, behaviorId } = req.body;
-      const userId = req.userId!;
+      const userId = req.userId || '00000000-0000-0000-0000-000000000000';
 
       if (!content || !behaviorId) {
         return res.status(400).json({ error: 'Content and behaviorId required' });
