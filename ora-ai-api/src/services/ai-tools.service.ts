@@ -552,7 +552,7 @@ export class AIToolsService {
     const result = await query(
       `SELECT check_in_date, mood, notes, created_at
        FROM user_progress
-       WHERE user_id = $1 AND check_in_date >= CURRENT_DATE - $2
+       WHERE user_id = $1 AND check_in_date >= (CURRENT_DATE - INTERVAL '1 day' * $2)::date
        ORDER BY check_in_date DESC`,
       [userId, days]
     );
@@ -578,7 +578,7 @@ export class AIToolsService {
     const params: any[] = [userId];
 
     if (days) {
-      queryText += ` AND sent_at >= CURRENT_DATE - $2`;
+      queryText += ` AND sent_at >= CURRENT_TIMESTAMP - INTERVAL '1 day' * $2`;
       params.push(days);
       queryText += ` ORDER BY sent_at DESC LIMIT $3`;
       params.push(limit);
@@ -607,7 +607,7 @@ export class AIToolsService {
       `SELECT ms.started_at, ms.completed_at, ms.duration_completed, m.title, m.category
        FROM meditation_sessions ms
        JOIN meditations m ON ms.meditation_id = m.id
-       WHERE ms.user_id = $1 AND ms.started_at >= CURRENT_DATE - $2
+       WHERE ms.user_id = $1 AND ms.started_at >= CURRENT_TIMESTAMP - INTERVAL '1 day' * $2
        ORDER BY ms.started_at DESC`,
       [userId, days]
     );
