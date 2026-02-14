@@ -1,0 +1,37 @@
+{
+  "testRunner": {
+    "args": {
+      "$0": "jest",
+      "config": "e2e/jest.config.js"
+    },
+    "jest": {
+      "setupTimeout": 120000
+    }
+  },
+  "apps": {
+    "ios": {
+      "type": "ios.app",
+      "binaryPath": "ios/build/Build/Products/Debug-iphonesimulator/OraAI.app",
+      "build": "xcodebuild -workspace ios/OraAI.xcworkspace -scheme OraAI -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build"
+    }
+  },
+  "devices": {
+    "simulator": {
+      "type": "ios.simulator",
+      "device": {
+        "type": "iPhone 15 Pro"
+      }
+    }
+  },
+  "configurations": {
+    "ios.debug": {
+      "device": "simulator",
+      "app": "ios"
+    },
+    "ios.release": {
+      "device": "simulator",
+      "app": "ios",
+      "build": "xcodebuild -workspace ios/OraAI.xcworkspace -scheme OraAI -configuration Release -sdk iphonesimulator -derivedDataPath ios/build"
+    }
+  }
+}

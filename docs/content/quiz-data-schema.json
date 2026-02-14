@@ -1,0 +1,252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ora AI Intake Quiz Response Schema",
+  "description": "Schema for storing user responses to the onboarding intake quiz",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Unique identifier for the user"
+    },
+    "quiz_version": {
+      "type": "string",
+      "description": "Version of the quiz (for future iterations)",
+      "default": "1.0"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of quiz completion"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when quiz was started"
+    },
+    "responses": {
+      "type": "object",
+      "properties": {
+        "q1_goals": {
+          "type": "object",
+          "description": "Q1: What brings you to Ora?",
+          "properties": {
+            "selected": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "stress_anxiety",
+                  "personal_growth",
+                  "building_habits",
+                  "relationships",
+                  "difficult_emotions",
+                  "wellness_mindfulness",
+                  "other"
+                ]
+              },
+              "minItems": 1
+            },
+            "other_text": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "User-provided text if 'other' is selected"
+            }
+          },
+          "required": ["selected"]
+        },
+        "q2_focus_area": {
+          "type": "object",
+          "description": "Q2: What area of your life could use the most attention?",
+          "properties": {
+            "selected": {
+              "type": "string",
+              "enum": [
+                "work_career",
+                "relationships_social",
+                "physical_health",
+                "personal_growth",
+                "emotional_wellbeing",
+                "purpose_meaning"
+              ]
+            }
+          },
+          "required": ["selected"]
+        },
+        "q3_reflection_style": {
+          "type": "object",
+          "description": "Q3: How do you prefer to reflect and process?",
+          "properties": {
+            "selected": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "writing_journaling",
+                  "talking_through",
+                  "guided_exercises",
+                  "meditation_mindfulness",
+                  "physical_activity",
+                  "creative_expression"
+                ]
+              },
+              "minItems": 1
+            }
+          },
+          "required": ["selected"]
+        },
+        "q4_biggest_challenge": {
+          "type": "object",
+          "description": "Q4: What's your biggest challenge right now? (optional)",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "skipped": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "q5_checkin_frequency": {
+          "type": "object",
+          "description": "Q5: How often would you like to check in?",
+          "properties": {
+            "selected": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "few_times_week",
+                "weekly",
+                "when_i_want"
+              ]
+            }
+          },
+          "required": ["selected"]
+        },
+        "q6_preferred_time": {
+          "type": "object",
+          "description": "Q6: What time works best for your wellness practice?",
+          "properties": {
+            "selected": {
+              "type": "string",
+              "enum": [
+                "morning",
+                "afternoon",
+                "evening",
+                "varies"
+              ]
+            }
+          },
+          "required": ["selected"]
+        },
+        "q7_therapy_background": {
+          "type": "object",
+          "description": "Q7: Have you worked with a therapist or counselor?",
+          "properties": {
+            "selected": {
+              "type": "string",
+              "enum": [
+                "yes_currently",
+                "yes_past",
+                "no_interested",
+                "no_prefer_selfguided",
+                "prefer_not_say"
+              ]
+            }
+          },
+          "required": ["selected"]
+        },
+        "q8_stress_level": {
+          "type": "object",
+          "description": "Q8: Current stress level (1-10 slider)",
+          "properties": {
+            "value": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": ["value"]
+        },
+        "q9_motivation_drivers": {
+          "type": "object",
+          "description": "Q9: What motivates you most? (pick up to 3)",
+          "properties": {
+            "selected": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "accountability_tracking",
+                  "encouragement",
+                  "data_insights",
+                  "structure_routine",
+                  "freedom_explore",
+                  "connection_others"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 3
+            }
+          },
+          "required": ["selected"]
+        },
+        "q10_additional_context": {
+          "type": "object",
+          "description": "Q10: Anything else you'd like Ora to know? (optional)",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "skipped": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "required": [
+        "q1_goals",
+        "q2_focus_area",
+        "q3_reflection_style",
+        "q5_checkin_frequency",
+        "q6_preferred_time",
+        "q7_therapy_background",
+        "q8_stress_level",
+        "q9_motivation_drivers"
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional tracking metadata",
+      "properties": {
+        "time_to_complete_seconds": {
+          "type": "integer",
+          "description": "Total time spent on quiz in seconds"
+        },
+        "device_type": {
+          "type": "string",
+          "enum": ["ios", "android", "web"],
+          "description": "Platform where quiz was completed"
+        },
+        "app_version": {
+          "type": "string",
+          "description": "App version at time of completion"
+        },
+        "revision_count": {
+          "type": "integer",
+          "default": 0,
+          "description": "Number of times user has updated quiz answers"
+        },
+        "last_revised_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last revision (if applicable)"
+        }
+      }
+    }
+  },
+  "required": ["user_id", "quiz_version", "completed_at", "responses"]
+}
