@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../theme';
-import { communityAPI } from '../services/api';
+import { communityAPI } from '../services/api/communityAPI';
 import { CommunityPost, Comment, PostCategory } from '../types';
 import { PostCard } from '../components/community/PostCard';
 import { CommentCard } from '../components/community/CommentCard';

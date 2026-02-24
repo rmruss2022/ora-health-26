@@ -198,6 +198,9 @@ export const lightColors = {
   surface: colors.white,
   surfaceElevated: colors.backgroundLight,
   text: colors.textPrimary,
+  // Meditation Collective aliases
+  forestGreen: colors.primary, // #1d473e
+  lavender: colors.secondary, // #D4B8E8
 };
 
 export const theme = {

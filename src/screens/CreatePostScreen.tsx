@@ -12,7 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../theme';
-import { communityAPI, categoriesAPI } from '../services/api';
+import { communityAPI } from '../services/api/communityAPI';
+import { categoriesAPI } from '../services/api/categoriesAPI';
 import { PostCategory } from '../types';
 
 interface CreatePostScreenProps {

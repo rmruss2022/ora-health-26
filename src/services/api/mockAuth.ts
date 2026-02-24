@@ -7,12 +7,12 @@ export const mockAuth = {
   // For now, we'll create a test user on first use
   async getOrCreateTestUser() {
     const testEmail = 'test@shadow-ai.com';
-    const testPassword = 'test123';
+    const testPassword = 'test1234';
     const baseURL = API_CONFIG.api.baseURL;
 
     try {
       // Try to sign in first
-      const response = await fetch(`${baseURL}/auth/signin`, {
+      const response = await fetch(`${baseURL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -26,11 +26,11 @@ export const mockAuth = {
       if (response.ok) {
         const data = await response.json();
         console.log('Mock auth: Successfully signed in');
-        return data.token;
+        return data.accessToken || data.token || null;
       }
 
       // If sign in fails, try to sign up
-      const signupResponse = await fetch(`${baseURL}/auth/signup`, {
+      const signupResponse = await fetch(`${baseURL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,13 +38,14 @@ export const mockAuth = {
         body: JSON.stringify({
           email: testEmail,
           password: testPassword,
+          name: 'Matthew',
         }),
       });
 
       if (signupResponse.ok) {
         const data = await signupResponse.json();
         console.log('Mock auth: Successfully signed up');
-        return data.token;
+        return data.accessToken || data.token || null;
       }
 
       // If both fail, just return null (we disabled auth middleware)

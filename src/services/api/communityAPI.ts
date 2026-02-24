@@ -28,8 +28,12 @@ export class CommunityAPI {
     const query = queryParams.toString();
     const endpoint = `/community/posts${query ? `?${query}` : ''}`;
 
-    const response = await apiClient.get<{ posts: CommunityPost[] }>(endpoint);
-    return response.posts;
+    const response = await apiClient.get<any>(endpoint);
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.posts)) return response.posts;
+    if (Array.isArray(response?.data)) return response.data;
+    if (Array.isArray(response?.data?.posts)) return response.data.posts;
+    return [];
   }
 
   async getPost(postId: string): Promise<CommunityPost> {

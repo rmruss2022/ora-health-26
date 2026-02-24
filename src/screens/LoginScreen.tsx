@@ -120,7 +120,7 @@ export function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: '#ECECEC',
   },
   content: {
     flex: 1,
@@ -128,14 +128,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: theme.colors.charcoal,
+    fontFamily: theme.typography.h2.fontFamily,
+    fontSize: 36,
+    color: '#575545',
     marginBottom: 8,
   },
   subtitle: {
+    fontFamily: theme.typography.body.fontFamily,
     fontSize: 16,
-    color: theme.colors.mediumGrey,
+    color: '#868074',
     marginBottom: 40,
   },
   form: {
@@ -145,19 +146,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
+    fontFamily: theme.typography.label.fontFamily,
     fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.charcoal,
+    color: '#666158',
     marginBottom: 8,
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 12,
+    borderColor: '#D7D3C8',
+    borderRadius: 14,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: theme.colors.white,
+    backgroundColor: '#F8F6F0',
+    color: '#4D4A42',
   },
   inputError: {
     borderColor: '#EF4444',
@@ -169,8 +171,8 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 50,
-    backgroundColor: theme.colors.charcoal,
-    borderRadius: 12,
+    backgroundColor: '#5C6C57',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 12,
@@ -179,9 +181,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: theme.colors.white,
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#F8F8F2',
+    fontFamily: theme.typography.button.fontFamily,
+    fontSize: 15,
   },
   footer: {
     flexDirection: 'row',
@@ -189,12 +191,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   footerText: {
-    color: theme.colors.mediumGrey,
+    color: '#898478',
     fontSize: 14,
   },
   linkText: {
-    color: theme.colors.charcoal,
+    color: '#5C6C57',
+    fontFamily: theme.typography.button.fontFamily,
     fontSize: 14,
-    fontWeight: '600',
   },
 });

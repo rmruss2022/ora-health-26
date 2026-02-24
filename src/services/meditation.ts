@@ -97,7 +97,17 @@ export const meditationApi = {
 
   // Get user's meditation stats
   async getUserStats(userId: string = 'default-user'): Promise<MeditationStats> {
-    const response = await apiClient.get<{ stats: MeditationStats }>(`/meditations/stats/user/${userId}`);
-    return response.stats;
+    try {
+      const response = await apiClient.get<{ stats: MeditationStats }>(`/meditations/stats/user/${userId}`);
+      return response.stats;
+    } catch (error) {
+      console.warn('Meditation stats unavailable, using defaults:', error);
+      return {
+        totalSessions: 0,
+        totalMinutes: 0,
+        currentStreak: 0,
+        completedThisWeek: 0,
+      };
+    }
   },
 };

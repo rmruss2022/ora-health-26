@@ -13,7 +13,22 @@ export class InboxAPI {
       offset: offset.toString()
     });
 
-    return apiClient.get(`/inbox/messages?${queryParams.toString()}`);
+    const response = await apiClient.get<any>(`/inbox/messages?${queryParams.toString()}`);
+
+    const messages =
+      response?.messages ??
+      response?.data?.messages ??
+      (Array.isArray(response) ? response : []);
+    const unreadCount =
+      response?.unreadCount ??
+      response?.data?.unreadCount ??
+      messages.filter((message: InboxMessage) => !message.isRead).length;
+    const totalCount =
+      response?.totalCount ??
+      response?.data?.totalCount ??
+      messages.length;
+
+    return { messages, unreadCount, totalCount };
   }
 
   async markAsRead(messageId: string): Promise<{ success: boolean }> {

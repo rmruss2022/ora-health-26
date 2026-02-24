@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { InboxMessage } from '../../types';
 import { theme } from '../../theme';
-import { inboxAPI } from '../../services/api';
+import { inboxAPI } from '../../services/api/inboxAPI';
 import { MessageResponseModal } from './MessageResponseModal';
 
 const MESSAGE_TYPE_ICONS: Record<string, string> = {

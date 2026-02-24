@@ -35,9 +35,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   // BYPASS AUTH: Always use mock user for testing
   const [user, setUser] = useState<AuthUser | null>({
-    id: 'test-user-123',
+    id: 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa',
     email: 'test@ora.ai',
-    name: 'Test User',
+    name: 'Matthew',
     created_at: new Date().toISOString(),
   });
   const [isLoading, setIsLoading] = useState(false);

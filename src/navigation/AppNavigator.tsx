@@ -7,12 +7,16 @@ import { useAuth } from '../context/AuthContext';
 import { ChatScreen } from '../screens/ChatScreen';
 import { MeditationScreen } from '../screens/MeditationScreen';
 import { MeditationTimerScreen } from '../screens/MeditationTimerScreen';
+import { CollectiveSessionScreen } from '../screens/CollectiveSessionScreen';
+import { DailyReflectionScreen } from '../screens/DailyReflectionScreen';
 import { CommunityScreen } from '../screens/CommunityScreen';
 import { CommentsScreen } from '../screens/CommentsScreen';
 import { CreatePostScreen } from '../screens/CreatePostScreen';
 import { LetterDetailScreen } from '../screens/LetterDetailScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
+import { HomeScreen } from '../screens/HomeScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { theme } from '../theme';
 
 const Tab = createBottomTabNavigator();
@@ -44,6 +48,8 @@ function MeditationStackNavigator() {
     >
       <MeditationStack.Screen name="MeditationLibrary" component={MeditationScreen} />
       <MeditationStack.Screen name="MeditationTimer" component={MeditationTimerScreen} />
+      <MeditationStack.Screen name="CollectiveSession" component={CollectiveSessionScreen} />
+      <MeditationStack.Screen name="DailyReflection" component={DailyReflectionScreen} />
     </MeditationStack.Navigator>
   );
 }
@@ -54,45 +60,58 @@ function MeditationStackNavigator() {
 function MainTabs() {
   return (
     <Tab.Navigator
-      initialRouteName="Chat"
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.colors.white,
-          borderTopColor: theme.colors.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          backgroundColor: '#F8F7F3',
+          borderTopColor: '#DDD8CB',
+          height: 76,
+          paddingBottom: 12,
+          paddingTop: 10,
+          borderTopWidth: 1,
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.mediumGrey,
+        tabBarActiveTintColor: '#526253',
+        tabBarInactiveTintColor: '#A8A59A',
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontFamily: theme.typography.labelSmall.fontFamily,
         },
       }}
     >
       <Tab.Screen
-        name="Chat"
-        component={ChatScreen}
+        name="Home"
+        component={HomeScreen}
         options={{
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>💬</Text>,
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⌂</Text>,
         }}
       />
       <Tab.Screen
-        name="Meditation"
+        name="Meditate"
         component={MeditationStackNavigator}
         options={{
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🧘</Text>,
-          tabBarLabel: 'Calm',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◠</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Chat"
+        component={ChatScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>✤</Text>,
         }}
       />
       <Tab.Screen
         name="Community"
         component={CommunityStackNavigator}
         options={{
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🤝</Text>,
-          tabBarLabel: 'Connect',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◉</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◍</Text>,
         }}
       />
     </Tab.Navigator>

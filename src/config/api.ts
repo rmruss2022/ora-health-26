@@ -10,3 +10,6 @@ export const API_CONFIG = {
     env: process.env.APP_ENV || 'development',
   },
 };
+
+// Export API_URL for convenience
+export const API_URL = API_CONFIG.api.baseURL;

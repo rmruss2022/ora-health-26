@@ -7,8 +7,11 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
 import { meditationApi, Meditation } from '../services/meditation';
+import { collectiveSessionService } from '../services/collective-session.service';
 
 interface Category {
   id: string;
@@ -29,14 +32,26 @@ interface MeditationScreenProps {
 }
 
 export const MeditationScreen: React.FC<MeditationScreenProps> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [meditations, setMeditations] = useState<Meditation[]>([]);
   const [loading, setLoading] = useState(true);
   const [featuredMeditation, setFeaturedMeditation] = useState<Meditation | null>(null);
+  const [upcomingSession, setUpcomingSession] = useState<any>(null);
 
   useEffect(() => {
     loadMeditations();
+    loadUpcomingSession();
   }, []);
+
+  const loadUpcomingSession = async () => {
+    try {
+      const session = await collectiveSessionService.getUpcomingSession();
+      setUpcomingSession(session);
+    } catch (error) {
+      console.error('Failed to load upcoming session:', error);
+    }
+  };
 
   const loadMeditations = async () => {
     try {
@@ -90,6 +105,23 @@ export const MeditationScreen: React.FC<MeditationScreenProps> = ({ navigation }
     navigation?.navigate('MeditationTimer', { meditation });
   };
 
+  const getTimeUntil = (scheduledTime: string): string => {
+    const now = new Date();
+    const sessionTime = new Date(scheduledTime);
+    const diffMs = sessionTime.getTime() - now.getTime();
+
+    if (diffMs < 0) return 'now';
+
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins} min`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -101,76 +133,103 @@ export const MeditationScreen: React.FC<MeditationScreenProps> = ({ navigation }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Find Calm</Text>
-        <Text style={styles.headerSubtitle}>
-          Practices for peace and presence
-        </Text>
-      </View>
-
-      {/* Today's Practice */}
-      {featuredMeditation && (
-        <View style={styles.featuredCard}>
-          <View style={styles.featuredBadge}>
-            <Text style={styles.featuredBadgeText}>Featured</Text>
-          </View>
-          <View style={styles.featuredContent}>
-            <Text style={styles.featuredIcon}>{featuredMeditation.icon}</Text>
-            <View style={styles.featuredInfo}>
-              <Text style={styles.featuredTitle}>{featuredMeditation.title}</Text>
-              <Text style={styles.featuredDescription}>
-                {featuredMeditation.description}
-              </Text>
-              <Text style={styles.featuredDuration}>{featuredMeditation.duration} minutes</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.featuredButton}
-            onPress={() => handleStartMeditation(featuredMeditation)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.featuredButtonText}>Begin →</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Categories */}
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryScroll}
-        contentContainerStyle={styles.categoryContent}
-      >
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category.id}
-            style={[
-              styles.categoryChip,
-              selectedCategory === category.id && styles.categoryChipActive,
-            ]}
-            onPress={() => setSelectedCategory(category.id)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <Text
-              style={[
-                styles.categoryLabel,
-                selectedCategory === category.id && styles.categoryLabelActive,
-              ]}
-            >
-              {category.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Meditations List */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.pageContent, { paddingBottom: insets.bottom + 88 }]}
       >
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <Text style={styles.headerTitle}>Find Calm</Text>
+          <Text style={styles.headerSubtitle}>
+            Practices for peace and presence
+          </Text>
+        </View>
+
+        {/* Collective Session Card */}
+        {upcomingSession && (
+          <TouchableOpacity
+            style={styles.collectiveCard}
+            onPress={() => navigation?.navigate('CollectiveSession', { sessionId: upcomingSession.id })}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[theme.colors.forestGreen, theme.colors.lavender]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.collectiveGradient}
+            >
+              <View style={styles.collectiveContent}>
+                <Text style={styles.collectiveIcon}>🌅</Text>
+                <View style={styles.collectiveInfo}>
+                  <Text style={styles.collectiveTitle}>Next Collective Session</Text>
+                  <Text style={styles.collectiveTime}>
+                    Starts in {getTimeUntil(upcomingSession.scheduledTime)}
+                  </Text>
+                  <Text style={styles.collectiveParticipants}>
+                    {upcomingSession.participantCount || 0} people joining
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.collectiveButton}>
+                <Text style={styles.collectiveButtonText}>Join →</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
+        {featuredMeditation && (
+          <View style={styles.featuredCard}>
+            <View style={styles.featuredBadge}>
+              <Text style={styles.featuredBadgeText}>Featured</Text>
+            </View>
+            <View style={styles.featuredContent}>
+              <Text style={styles.featuredIcon}>{featuredMeditation.icon}</Text>
+              <View style={styles.featuredInfo}>
+                <Text style={styles.featuredTitle}>{featuredMeditation.title}</Text>
+                <Text style={styles.featuredDescription}>
+                  {featuredMeditation.description}
+                </Text>
+                <Text style={styles.featuredDuration}>{featuredMeditation.duration} minutes</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.featuredButton}
+              onPress={() => handleStartMeditation(featuredMeditation)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.featuredButtonText}>Begin →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+          contentContainerStyle={styles.categoryContent}
+        >
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryChip,
+                selectedCategory === category.id && styles.categoryChipActive,
+              ]}
+              onPress={() => setSelectedCategory(category.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.categoryIcon}>{category.icon}</Text>
+              <Text
+                style={[
+                  styles.categoryLabel,
+                  selectedCategory === category.id && styles.categoryLabelActive,
+                ]}
+              >
+                {category.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         {filteredMeditations.map((meditation) => (
           <TouchableOpacity
             key={meditation.id}
@@ -212,7 +271,7 @@ export const MeditationScreen: React.FC<MeditationScreenProps> = ({ navigation }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.backgroundLight,
+    backgroundColor: '#ECECEC',
   },
   loadingContainer: {
     justifyContent: 'center',
@@ -224,10 +283,11 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
   },
   header: {
-    backgroundColor: theme.colors.cream,
-    paddingTop: 60,
-    paddingBottom: theme.spacing.xxl,
+    backgroundColor: '#D2CCAB',
+    paddingBottom: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   headerTitle: {
     ...theme.typography.h1,
@@ -238,19 +298,69 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textSecondary,
   },
-  featuredCard: {
-    backgroundColor: theme.colors.white,
+  collectiveCard: {
     marginHorizontal: theme.spacing.lg,
-    marginTop: -theme.spacing.xl,
+    marginTop: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+    ...theme.shadows.lg,
+  },
+  collectiveGradient: {
+    padding: theme.spacing.lg,
+  },
+  collectiveContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  collectiveIcon: {
+    fontSize: 40,
+    marginRight: theme.spacing.md,
+  },
+  collectiveInfo: {
+    flex: 1,
+  },
+  collectiveTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.cream,
+    marginBottom: 4,
+  },
+  collectiveTime: {
+    ...theme.typography.body,
+    color: theme.colors.cream,
+    opacity: 0.9,
+    marginBottom: 2,
+  },
+  collectiveParticipants: {
+    ...theme.typography.small,
+    color: theme.colors.cream,
+    opacity: 0.8,
+  },
+  collectiveButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: theme.borderRadius.md,
+  },
+  collectiveButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.cream,
+    fontWeight: '600',
+  },
+  featuredCard: {
+    backgroundColor: '#F6F5F1',
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
     padding: theme.spacing.xl,
     borderRadius: theme.borderRadius.xl,
     ...theme.shadows.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#D5D1C6',
   },
   featuredBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.colors.goldenLightest,
+    backgroundColor: '#D8CE9C',
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
     borderRadius: theme.borderRadius.sm,
@@ -258,7 +368,7 @@ const styles = StyleSheet.create({
   },
   featuredBadgeText: {
     ...theme.typography.tiny,
-    color: theme.colors.golden,
+    color: '#565129',
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -291,7 +401,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   featuredButton: {
-    backgroundColor: theme.colors.charcoal,
+    backgroundColor: '#5C6C57',
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.full,
@@ -303,30 +413,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryScroll: {
-    backgroundColor: theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    marginTop: theme.spacing.lg,
+    backgroundColor: '#F6F5F1',
+    marginTop: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: '#D6D1C5',
   },
   categoryContent: {
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
     gap: theme.spacing.xs,
+    alignItems: 'center',
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 8,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.white,
-    marginRight: theme.spacing.xs,
+    backgroundColor: '#FAF8F3',
+    marginRight: 6,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#D8D3C8',
+    alignSelf: 'center',
   },
   categoryChipActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor: '#7B845F',
+    borderColor: '#7B845F',
   },
   categoryIcon: {
     fontSize: 16,
@@ -340,8 +454,8 @@ const styles = StyleSheet.create({
   categoryLabelActive: {
     color: theme.colors.textLight,
   },
-  scrollView: {
-    flex: 1,
+  pageContent: {
+    paddingBottom: theme.spacing.lg,
   },
   scrollContent: {
     padding: theme.spacing.lg,
@@ -349,13 +463,13 @@ const styles = StyleSheet.create({
   meditationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: '#F7F5EE',
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     ...theme.shadows.sm,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#D8D3C8',
   },
   meditationIcon: {
     width: 56,
@@ -392,7 +506,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: '#66734E',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: theme.spacing.sm,

@@ -69,11 +69,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   userBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2d5e52',
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FAF8F3',
     borderBottomLeftRadius: 4,
   },
   text: {

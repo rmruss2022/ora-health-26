@@ -14,6 +14,8 @@ const welcomeMessages: Record<string, string> = {
   'guided-exercise': "Welcome! I'm here to guide you through personal growth exercises. What area would you like to focus on: gratitude, cognitive reframing, or values clarification?",
   'progress-analysis': "Hello! I'm here to help you understand your personal growth journey. Share your recent experiences and I'll provide insights on your progress.",
   'weekly-planning': "Welcome to weekly planning! Let's set meaningful intentions for your week ahead. What are your priorities for the coming days?",
+  'weekly-review': "Welcome to your weekly review. Let's reflect on what went well, what felt challenging, and what you want to carry forward.",
+  'self-compassion-exercise': "Welcome. We'll do a gentle guided exercise to reduce stress and self-criticism. What feels most intense for you right now?",
 };
 
 export const useChat = (behaviorId: string = 'free-form-chat') => {

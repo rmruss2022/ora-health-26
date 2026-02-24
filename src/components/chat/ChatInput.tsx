@@ -10,9 +10,10 @@ import {
 interface ChatInputProps {
   onSend: (text: string) => void;
   isLoading: boolean;
+  placeholder?: string;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isLoading }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isLoading, placeholder = "Type a message..." }) => {
   const [text, setText] = useState('');
 
   const handleSend = () => {
@@ -37,7 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isLoading }) => {
           style={styles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Type a message..."
+          placeholder={placeholder}
           placeholderTextColor="#999"
           multiline
           maxLength={1000}
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2d5e52',
     alignItems: 'center',
     justifyContent: 'center',
   },
