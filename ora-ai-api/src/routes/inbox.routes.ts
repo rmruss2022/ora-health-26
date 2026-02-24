@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { inboxService } from '../services/inbox.service';
 
 const router = Router();
+const TEST_USER_ID = 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa';
 
 // Get inbox messages
 router.get('/messages', async (req, res) => {
   try {
-    const userId = req.query.userId as string || 'default-user';
+    const userId = (req.query.userId as string) || TEST_USER_ID;
     const unreadOnly = req.query.unreadOnly === 'true';
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -28,7 +29,7 @@ router.get('/messages', async (req, res) => {
 router.post('/messages/:messageId/read', async (req, res) => {
   try {
     const { messageId } = req.params;
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
 
     await inboxService.markAsRead(messageId, userId);
     res.json({ success: true });
@@ -42,7 +43,7 @@ router.post('/messages/:messageId/read', async (req, res) => {
 router.post('/messages/:messageId/archive', async (req, res) => {
   try {
     const { messageId } = req.params;
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
 
     await inboxService.archiveMessage(messageId, userId);
     res.json({ success: true });
@@ -56,7 +57,7 @@ router.post('/messages/:messageId/archive', async (req, res) => {
 router.post('/messages/:messageId/respond', async (req, res) => {
   try {
     const { messageId } = req.params;
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
     const { responseText, createPost, isAnonymous, authorName, authorAvatar } = req.body;
 
     if (!responseText) {
@@ -83,7 +84,7 @@ router.post('/messages/:messageId/respond', async (req, res) => {
 // Get unread count
 router.get('/unread-count', async (req, res) => {
   try {
-    const userId = req.query.userId as string || 'default-user';
+    const userId = (req.query.userId as string) || TEST_USER_ID;
 
     const count = await inboxService.getUnreadCount(userId);
     res.json({ count });
@@ -96,7 +97,7 @@ router.get('/unread-count', async (req, res) => {
 // Generate daily message (for testing/admin use)
 router.post('/generate-daily', async (req, res) => {
   try {
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
 
     const message = await inboxService.generateDailyMessage(userId);
     res.json({ message });

@@ -1,4 +1,4 @@
-// Configuration for NVIDIA/MoonshotAI Kimi K2.5 model
+// Configuration for NVIDIA-hosted Kimi K2.5 model
 // Uses OpenAI-compatible API
 
 export interface KimiConfig {
@@ -12,26 +12,20 @@ let kimiConfig: KimiConfig | null = null;
 
 export function getKimiConfig(): KimiConfig {
   if (!kimiConfig) {
-    const apiKey = process.env.KIMI_API_KEY || process.env.NVIDIA_API_KEY;
-    if (!apiKey || apiKey === 'your_kimi_api_key_here' || apiKey === 'your_nvidia_api_key_here') {
-      throw new Error('KIMI_API_KEY or NVIDIA_API_KEY not configured');
+    const apiKey = process.env.NVIDIA_API_KEY;
+    if (!apiKey || apiKey === 'your_nvidia_api_key_here') {
+      throw new Error('NVIDIA_API_KEY not configured');
     }
 
-    // Support both MoonshotAI direct API and NVIDIA NIM
-    const baseURL = process.env.KIMI_BASE_URL || 
-                   process.env.NVIDIA_BASE_URL || 
-                   'https://api.moonshot.cn/v1';
-    
-    // Model options: 
-    // - MoonshotAI direct: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
-    // - NVIDIA NIM: moonshotai/kimi-k2.5
-    const model = process.env.KIMI_MODEL || process.env.NVIDIA_MODEL || 'moonshotai/kimi-k2.5';
+    const baseURL =
+      process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
+    const model = process.env.NVIDIA_MODEL || 'moonshotai/kimi-k2.5';
     
     kimiConfig = {
       apiKey,
       baseURL,
       model,
-      maxTokens: parseInt(process.env.KIMI_MAX_TOKENS || '2000'),
+      maxTokens: parseInt(process.env.NVIDIA_MAX_TOKENS || '2000'),
     };
   }
   return kimiConfig;
@@ -51,6 +45,9 @@ export function convertToolsToOpenAIFormat(anthropicTools: any[]): any[] {
 
 export async function callKimiAPI(messages: any[], systemPrompt?: string, tools?: any[]) {
   const config = getKimiConfig();
+  const timeoutMs = parseInt(process.env.NVIDIA_TIMEOUT_MS || '45000', 10);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   
   const requestBody: any = {
     model: config.model,
@@ -67,14 +64,25 @@ export async function callKimiAPI(messages: any[], systemPrompt?: string, tools?
     requestBody.tool_choice = 'auto';
   }
 
-  const response = await fetch(`${config.baseURL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${config.baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`NVIDIA API timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const errorData: any = await response.json().catch(() => ({}));

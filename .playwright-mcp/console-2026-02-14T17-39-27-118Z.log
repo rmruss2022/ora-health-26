@@ -1,0 +1,16 @@
+[     153ms] [WARNING] "shadow*" style props are deprecated. Use "boxShadow". @ http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:23463
+[     167ms] [WARNING] "textShadow*" style props are deprecated. Use "textShadow". @ http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:23463
+[     259ms] [WARNING] props.pointerEvents is deprecated. Use style.pointerEvents @ http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:23463
+[     311ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:4000/auth/signin:0
+[     314ms] [ERROR] Failed to load resource: the server responded with a status of 429 (Too Many Requests) @ http://localhost:4000/auth/signup:0
+[     314ms] [WARNING] Mock auth: Could not authenticate, proceeding without token @ :148
+[     323ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:4000/meditations/stats/user/test-user-123:0
+[     324ms] [ERROR] Failed to load home data: APIError: Request failed
+    at APIClient.request (http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:75440:17)
+    at async Object.getUserStats (http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:76761:24)
+    at async Promise.all (index 1)
+    at async loadHomeData (http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:117151:53) @ http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:117156
+[   52560ms] [WARNING] Disconnected from Metro (1006)
+To reconnect:
+- Ensure that Metro is running and available on the same network
+- Reload this app (will trigger further help if Metro cannot be connected to) @ http://localhost:8085/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:1732

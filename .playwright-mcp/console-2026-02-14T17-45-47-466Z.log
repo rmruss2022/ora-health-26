@@ -1,0 +1,17 @@
+[     213ms] [WARNING] "shadow*" style props are deprecated. Use "boxShadow". @ http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:23463
+[     240ms] [WARNING] "textShadow*" style props are deprecated. Use "textShadow". @ http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:23463
+[     314ms] [WARNING] props.pointerEvents is deprecated. Use style.pointerEvents @ http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:23463
+[     397ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:4000/auth/login:0
+[     400ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:4000/auth/register:0
+[     400ms] [WARNING] Mock auth: Could not authenticate, proceeding without token @ :149
+[     409ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:4000/meditations/stats/user/test-user-123:0
+[     409ms] [WARNING] Meditation stats unavailable, using defaults: APIError: Request failed
+    at APIClient.request (http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:75440:17)
+    at async Object.getUserStats (http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:76762:26)
+    at async Promise.allSettled (index 1)
+    at async loadHomeData (http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:117328:52) @ http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:76764
+[    8627ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:4000/inbox/messages?unreadOnly=false&limit=50&offset=0:0
+[    8627ms] [ERROR] Error loading messages: APIError: Request failed
+    at APIClient.request (http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:75440:17)
+    at async InboxAPI.getMessages (http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:112665:24)
+    at async loadMessages (http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:112185:24) @ http://localhost:8088/index.ts.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable:112188

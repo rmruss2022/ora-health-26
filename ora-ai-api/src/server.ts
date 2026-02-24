@@ -24,10 +24,32 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3000;
+const configuredOrigins = process.env.ALLOWED_ORIGINS?.split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean) || [];
 
 // Middleware
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: (requestOrigin, callback) => {
+    // Allow native apps and server-side requests with no Origin header.
+    if (!requestOrigin) {
+      callback(null, true);
+      return;
+    }
+
+    const isLocalhost =
+      /^http:\/\/localhost:\d+$/.test(requestOrigin) ||
+      /^http:\/\/127\.0\.0\.1:\d+$/.test(requestOrigin);
+    const isExplicitlyAllowed =
+      configuredOrigins.length === 0 || configuredOrigins.includes(requestOrigin);
+
+    if (isLocalhost || isExplicitlyAllowed) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin ${requestOrigin} is not allowed by CORS`));
+  },
   credentials: true,
 }));
 app.use(express.json());

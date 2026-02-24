@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { communityService } from '../services/community.service';
 
 const router = Router();
+const TEST_USER_ID = 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa';
 
 // Get categories
 router.get('/categories', async (req, res) => {
@@ -17,7 +18,7 @@ router.get('/categories', async (req, res) => {
 // Get community posts
 router.get('/posts', async (req, res) => {
   try {
-    const userId = req.query.userId as string || 'default-user';
+    const userId = (req.query.userId as string) || TEST_USER_ID;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
     const category = req.query.category as string | undefined;
@@ -33,7 +34,7 @@ router.get('/posts', async (req, res) => {
 // Create new post
 router.post('/posts', async (req, res) => {
   try {
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
     const { type, category, content, promptText, tags, isAnonymous, authorName, authorAvatar } = req.body;
 
     if (!type || !category || !content) {
@@ -62,7 +63,7 @@ router.post('/posts', async (req, res) => {
 router.post('/posts/:postId/like', async (req, res) => {
   try {
     const { postId } = req.params;
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
 
     const result = await communityService.likePost(postId, userId);
     res.json(result);
@@ -90,7 +91,7 @@ router.get('/posts/:postId/comments', async (req, res) => {
 router.post('/posts/:postId/comments', async (req, res) => {
   try {
     const { postId } = req.params;
-    const userId = req.body.userId || 'default-user';
+    const userId = req.body.userId || TEST_USER_ID;
     const { content, isAnonymous, authorName, authorAvatar } = req.body;
 
     if (!content) {
