@@ -1,4 +1,6 @@
 import { query } from '../config/database';
+import { websocketService } from './websocket.service';
+import { communityService } from './community.service';
 
 export interface CollectiveSession {
   id: string;
@@ -118,7 +120,15 @@ export class CollectiveSessionService {
     `;
 
     const result = await query(queryText, [sessionId]);
-    return result.rows[0];
+    const session = result.rows[0];
+
+    // Broadcast session started event
+    websocketService.notifyCollectiveSessionStarted(sessionId, {
+      durationMinutes: session.durationMinutes,
+      participantCount: session.participantCount,
+    });
+
+    return session;
   }
 
   /**
@@ -146,6 +156,11 @@ export class CollectiveSessionService {
     // Update participant count
     await this.updateParticipantCount(sessionId);
 
+    // Subscribe user to session room and broadcast join event
+    const updatedCount = await this.getParticipantCount(sessionId);
+    websocketService.subscribeToCollectiveSession(userId, sessionId);
+    websocketService.notifyCollectiveUserJoined(sessionId, updatedCount);
+
     return participantResult.rows[0];
   }
 
@@ -161,6 +176,11 @@ export class CollectiveSessionService {
 
     await query(updateQuery, [sessionId, userId]);
     await this.updateParticipantCount(sessionId);
+
+    // Unsubscribe user from session room and broadcast leave event
+    const updatedCount = await this.getParticipantCount(sessionId);
+    websocketService.unsubscribeFromCollectiveSession(userId, sessionId);
+    websocketService.notifyCollectiveUserLeft(sessionId, updatedCount);
   }
 
   /**
@@ -169,7 +189,8 @@ export class CollectiveSessionService {
   async completeSessionForUser(
     sessionId: string,
     userId: string,
-    emoji?: string
+    emoji?: string,
+    shareToCommunity?: boolean
   ): Promise<void> {
     const updateQuery = `
       UPDATE collective_participants
@@ -178,6 +199,24 @@ export class CollectiveSessionService {
     `;
 
     await query(updateQuery, [sessionId, userId, emoji]);
+
+    // Optionally create community post
+    if (shareToCommunity) {
+      try {
+        // Get session duration
+        const sessionQuery = `
+          SELECT duration_minutes FROM collective_sessions WHERE id = $1
+        `;
+        const sessionResult = await query(sessionQuery, [sessionId]);
+        const durationMinutes = sessionResult.rows[0]?.duration_minutes || 10;
+
+        // Create meditation post
+        await communityService.createMeditationPost(userId, durationMinutes, emoji);
+      } catch (error) {
+        console.error('Error creating meditation community post:', error);
+        // Don't fail the completion if community post fails
+      }
+    }
   }
 
   /**
@@ -237,7 +276,16 @@ export class CollectiveSessionService {
     `;
 
     const result = await query(queryText, [sessionId]);
-    return result.rows[0];
+    const session = result.rows[0];
+
+    // Get stats and broadcast session ended event
+    const stats = await this.getSessionStats(sessionId);
+    websocketService.notifyCollectiveSessionEnded(sessionId, {
+      participantCount: stats.participantCount,
+      completedCount: stats.completedParticipants,
+    });
+
+    return session;
   }
 
   /**
@@ -275,6 +323,21 @@ export class CollectiveSessionService {
 
     const result = await query(queryText, [sessionId]);
     return result.rows;
+  }
+
+  /**
+   * Check if a session exists at a specific time
+   */
+  async sessionExistsAtTime(scheduledTime: Date): Promise<boolean> {
+    const queryText = `
+      SELECT id
+      FROM collective_sessions
+      WHERE scheduled_time = $1
+      LIMIT 1
+    `;
+
+    const result = await query(queryText, [scheduledTime]);
+    return result.rows.length > 0;
   }
 }
 

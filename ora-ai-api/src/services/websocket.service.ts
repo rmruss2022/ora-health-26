@@ -420,6 +420,116 @@ export class WebSocketService {
 
     return cleaned;
   }
+
+  /**
+   * Collective Meditation Events
+   */
+
+  /**
+   * Notify users that a collective session is starting soon (5 min warning)
+   */
+  notifyCollectiveSessionStarting(sessionId: string, sessionData: {
+    scheduledTime: string;
+    durationMinutes: number;
+    participantCount: number;
+  }): void {
+    this.broadcastToAll('collective:session-starting' as any, {
+      sessionId,
+      ...sessionData,
+    });
+    console.log(`[WebSocket] Broadcast collective session starting: ${sessionId}`);
+  }
+
+  /**
+   * Notify that a collective session has started
+   */
+  notifyCollectiveSessionStarted(sessionId: string, sessionData: {
+    durationMinutes: number;
+    participantCount: number;
+  }): void {
+    this.broadcastToAll('collective:session-started' as any, {
+      sessionId,
+      ...sessionData,
+    });
+    console.log(`[WebSocket] Broadcast collective session started: ${sessionId}`);
+  }
+
+  /**
+   * Broadcast when a user joins a collective session
+   */
+  notifyCollectiveUserJoined(sessionId: string, participantCount: number): void {
+    if (!this.io) return;
+
+    this.io.to(`collective:${sessionId}`).emit('collective:user-joined', {
+      sessionId,
+      participantCount,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
+   * Broadcast when a user leaves a collective session
+   */
+  notifyCollectiveUserLeft(sessionId: string, participantCount: number): void {
+    if (!this.io) return;
+
+    this.io.to(`collective:${sessionId}`).emit('collective:user-left', {
+      sessionId,
+      participantCount,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
+   * Notify that a collective session has ended
+   */
+  notifyCollectiveSessionEnded(sessionId: string, sessionData: {
+    participantCount: number;
+    completedCount: number;
+  }): void {
+    if (!this.io) return;
+
+    this.io.to(`collective:${sessionId}`).emit('collective:session-ended', {
+      sessionId,
+      ...sessionData,
+      timestamp: new Date(),
+    });
+    console.log(`[WebSocket] Broadcast collective session ended: ${sessionId}`);
+  }
+
+  /**
+   * Subscribe a user to a collective session room
+   */
+  subscribeToCollectiveSession(userId: string, sessionId: string): void {
+    const socketIds = this.userSocketMap.get(userId);
+    if (!socketIds || !this.io) return;
+
+    for (const socketId of socketIds) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.join(`collective:${sessionId}`);
+      }
+    }
+
+    console.log(`[WebSocket] User ${userId} subscribed to collective session ${sessionId}`);
+  }
+
+  /**
+   * Unsubscribe a user from a collective session room
+   */
+  unsubscribeFromCollectiveSession(userId: string, sessionId: string): void {
+    const socketIds = this.userSocketMap.get(userId);
+    if (!socketIds || !this.io) return;
+
+    for (const socketId of socketIds) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.leave(`collective:${sessionId}`);
+      }
+    }
+
+    console.log(`[WebSocket] User ${userId} unsubscribed from collective session ${sessionId}`);
+  }
 }
 
 // Singleton instance

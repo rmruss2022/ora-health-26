@@ -13,10 +13,12 @@ import profileRoutes from './routes/profile.routes';
 import letterRoutes from './routes/letter.routes';
 import reactionsRoutes from './routes/reactions.routes';
 import collectiveRoutes from './routes/collective.routes';
+import reflectionRoutes from './routes/reflection.routes';
 // import analyticsRoutes from './routes/analytics.routes';
 // import backgroundRoutes from './routes/background.routes';
 // import notificationsRoutes from './routes/notifications.routes';
 import { scheduleDailyLetters } from './jobs/daily-letters.cron';
+import { startCollectiveSessionScheduler } from './jobs/schedule-collective-sessions.cron';
 import { WebSocketService } from './services/websocket.service';
 
 // Load environment variables
@@ -73,6 +75,7 @@ app.use('/api/users', profileRoutes);
 app.use('/api/letters', letterRoutes);
 app.use('/api/reactions', reactionsRoutes);
 app.use('/api/collective', collectiveRoutes);
+app.use('/api/reflections', reflectionRoutes);
 // app.use('/api/analytics', analyticsRoutes);
 // app.use('/api/background', backgroundRoutes);
 // app.use('/api/notifications', notificationsRoutes);
@@ -106,5 +109,8 @@ httpServer.listen(PORT, () => {
   if (process.env.ENABLE_CRON_JOBS !== 'false') {
     scheduleDailyLetters();
     console.log('📬 Daily letter cron job scheduled');
+    
+    startCollectiveSessionScheduler();
+    console.log('🧘 Collective session scheduler started');
   }
 });

@@ -314,6 +314,104 @@ export class PushNotificationService {
         return false;
     }
   }
+
+  /**
+   * Collective Meditation Notifications
+   */
+
+  /**
+   * Send 5-minute warning for upcoming collective session
+   */
+  async sendCollectiveSessionWarning(
+    participantCount: number,
+    sessionId: string
+  ): Promise<{ sent: number; failed: number }> {
+    try {
+      // Get all users who want meditation notifications
+      const usersResult = await query(
+        `SELECT DISTINCT u.id
+         FROM users u
+         JOIN user_notification_preferences p ON u.id = p.user_id
+         WHERE (p.notifications_enabled = true OR p.notifications_enabled IS NULL)
+         LIMIT 1000` // Prevent sending to too many at once
+      );
+
+      const userIds = usersResult.rows.map((row: any) => row.id);
+
+      if (userIds.length === 0) {
+        return { sent: 0, failed: 0 };
+      }
+
+      // Send notification to all users
+      return await this.sendToUsers(
+        userIds,
+        '🌅 Collective Meditation Starting Soon',
+        `${participantCount} ${participantCount === 1 ? 'person is' : 'people are'} meditating in 5 minutes. Join?`,
+        {
+          type: 'collective_session_warning',
+          sessionId,
+          participantCount,
+        }
+      );
+    } catch (error) {
+      console.error('Error sending collective session warning:', error);
+      return { sent: 0, failed: 0 };
+    }
+  }
+
+  /**
+   * Send notification that a collective session has started
+   */
+  async sendCollectiveSessionStarted(
+    participantCount: number,
+    sessionId: string
+  ): Promise<{ sent: number; failed: number }> {
+    try {
+      const usersResult = await query(
+        `SELECT DISTINCT u.id
+         FROM users u
+         JOIN user_notification_preferences p ON u.id = p.user_id
+         WHERE (p.notifications_enabled = true OR p.notifications_enabled IS NULL)
+         LIMIT 1000`
+      );
+
+      const userIds = usersResult.rows.map((row: any) => row.id);
+
+      if (userIds.length === 0) {
+        return { sent: 0, failed: 0 };
+      }
+
+      return await this.sendToUsers(
+        userIds,
+        '🧘 Collective Meditation Now',
+        `${participantCount} ${participantCount === 1 ? 'person is' : 'people are'} meditating right now`,
+        {
+          type: 'collective_session_started',
+          sessionId,
+          participantCount,
+        }
+      );
+    } catch (error) {
+      console.error('Error sending collective session started notification:', error);
+      return { sent: 0, failed: 0 };
+    }
+  }
+
+  /**
+   * Send daily reflection reminder
+   */
+  async sendDailyReflectionReminder(userId: string): Promise<boolean> {
+    return await this.sendToUser({
+      userId,
+      title: '✨ Daily Reflection',
+      body: 'Take a moment to reflect on your day',
+      data: {
+        type: 'daily_reflection',
+      },
+      channelId: 'meditation',
+      priority: 'normal',
+    });
+  }
 }
 
 // Singleton instance

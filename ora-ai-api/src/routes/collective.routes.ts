@@ -132,13 +132,13 @@ router.post('/sessions/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.body.userId || (req as any).user?.id;
-    const { emoji } = req.body;
+    const { emoji, shareToCommunity } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    await collectiveSessionService.completeSessionForUser(id, userId, emoji);
+    await collectiveSessionService.completeSessionForUser(id, userId, emoji, shareToCommunity);
     res.json({ success: true });
   } catch (error) {
     console.error('Error completing session for user:', error);
