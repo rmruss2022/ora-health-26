@@ -1,42 +1,148 @@
-import { getAnthropicClient, ANTHROPIC_CONFIG } from '../config/anthropic';
 import { callKimiAPI, getKimiConfig } from '../config/kimi';
+import { getAnthropicClient, ANTHROPIC_CONFIG } from '../config/anthropic';
 import { postgresService } from './postgres.service';
 import { aiTools, aiToolsService } from './ai-tools.service';
 import { behaviorDetectionService } from './behavior-detection.service';
+import { BEHAVIORS } from '../config/behaviors';
+
+type KimiErrorCategory =
+  | 'timeout'
+  | 'rate_limit'
+  | 'server'
+  | 'network'
+  | 'bad_request'
+  | 'auth'
+  | 'unknown';
 
 export class AIService {
-  private getProvider(): 'anthropic' | 'kimi' | 'mock' {
-    const provider = process.env.AI_PROVIDER?.toLowerCase() || 'auto';
-    
-    if (provider === 'anthropic') {
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (anthropicKey && anthropicKey !== 'your_anthropic_api_key_here') {
-        return 'anthropic';
+  private resolveRequestedBehaviorId(requestedBehaviorId: string): string {
+    const behaviorAliasMap: Record<string, string> = {
+      planning: 'weekly-planning',
+      review: 'weekly-review',
+      journal: 'weekly-review',
+      exercise: 'self-compassion-exercise',
+      'journal-prompt': 'weekly-review',
+      'guided-exercise': 'self-compassion-exercise',
+      'progress-analysis': 'weekly-review',
+    };
+
+    return behaviorAliasMap[requestedBehaviorId] || requestedBehaviorId;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private extractStatusCode(error: unknown): number | null {
+    const message = error instanceof Error ? error.message : String(error);
+    const match = message.match(/\((\d{3})\)/);
+    if (!match) return null;
+    return parseInt(match[1], 10);
+  }
+
+  private classifyKimiError(error: unknown): KimiErrorCategory {
+    const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+    const status = this.extractStatusCode(error);
+
+    if (message.includes('timeout') || message.includes('aborted')) return 'timeout';
+    if (status === 429 || message.includes('rate limit') || message.includes('too many requests')) return 'rate_limit';
+    if (status === 400) return 'bad_request';
+    if (status === 401 || status === 403 || message.includes('unauthorized') || message.includes('forbidden')) return 'auth';
+    if (status && status >= 500) return 'server';
+    if (message.includes('network') || message.includes('fetch failed') || message.includes('econn') || message.includes('socket')) return 'network';
+
+    return 'unknown';
+  }
+
+  private isRetryableKimiError(category: KimiErrorCategory): boolean {
+    return category === 'timeout' || category === 'rate_limit' || category === 'server' || category === 'network';
+  }
+
+  private getRetryDelayMs(category: KimiErrorCategory, attempt: number): number {
+    // attempt is 1-indexed
+    switch (category) {
+      case 'timeout':
+        return 2000 * attempt;
+      case 'rate_limit':
+        return 4000 * attempt;
+      case 'server':
+      case 'network':
+        return 1500 * attempt;
+      default:
+        return 1500 * attempt;
+    }
+  }
+
+  private async callKimiWithRetry(
+    messages: any[],
+    systemPrompt: string,
+    tools: any[] | undefined,
+    phase: 'initial' | 'tool-followup'
+  ): Promise<any> {
+    const maxAttempts = 3;
+    let currentTools = tools;
+    let disabledToolsAfterBadRequest = false;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await callKimiAPI(messages, systemPrompt, currentTools);
+      } catch (error) {
+        lastError = error;
+        const category = this.classifyKimiError(error);
+        const status = this.extractStatusCode(error);
+
+        // Tool schema/tool call formatting problems often manifest as 400s.
+        // Retry once without tools to keep the conversation responsive.
+        if (
+          category === 'bad_request' &&
+          !disabledToolsAfterBadRequest &&
+          currentTools &&
+          currentTools.length > 0
+        ) {
+          console.warn(
+            `[Kimi retry] ${phase}: disabling tools after bad request (status=${status ?? 'n/a'})`
+          );
+          currentTools = undefined;
+          disabledToolsAfterBadRequest = true;
+          continue;
+        }
+
+        if (!this.isRetryableKimiError(category) || attempt === maxAttempts) {
+          throw error;
+        }
+
+        const delayMs = this.getRetryDelayMs(category, attempt);
+        console.warn(
+          `[Kimi retry] ${phase}: attempt ${attempt}/${maxAttempts} failed (${category}, status=${status ?? 'n/a'}). Retrying in ${delayMs}ms`
+        );
+        await this.sleep(delayMs);
       }
     }
-    
-    if (provider === 'kimi') {
-      const kimiKey = process.env.KIMI_API_KEY || process.env.NVIDIA_API_KEY;
-      if (kimiKey && kimiKey !== 'your_kimi_api_key_here' && kimiKey !== 'your_nvidia_api_key_here') {
-        return 'kimi';
+
+    throw lastError instanceof Error ? lastError : new Error('Unknown Kimi API error');
+  }
+
+  private getProvider(): 'anthropic' | 'nvidia' | 'mock' {
+    const provider = process.env.AI_PROVIDER?.toLowerCase();
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    const hasAnthropic = !!anthropicKey && anthropicKey !== 'your_anthropic_api_key_here';
+    const hasNvidia = !!nvidiaKey && nvidiaKey !== 'your_nvidia_api_key_here';
+
+    // Prefer Anthropic when available to keep chat on Claude.
+    if (hasAnthropic) {
+      if (provider && provider !== 'anthropic') {
+        console.warn(`AI_PROVIDER="${provider}" overridden to Anthropic because ANTHROPIC_API_KEY is configured`);
       }
+      return 'anthropic';
     }
-    
-    // Auto-detect: prefer Kimi if available, then Anthropic, then mock
-    if (provider === 'auto' || provider === 'kimi') {
-      const kimiKey = process.env.KIMI_API_KEY || process.env.NVIDIA_API_KEY;
-      if (kimiKey && kimiKey !== 'your_kimi_api_key_here' && kimiKey !== 'your_nvidia_api_key_here') {
-        return 'kimi';
-      }
+
+    if (provider === 'anthropic' && !hasAnthropic) {
+      console.warn('AI_PROVIDER="anthropic" set but ANTHROPIC_API_KEY is missing; falling back');
     }
-    
-    if (provider === 'auto' || provider === 'anthropic') {
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (anthropicKey && anthropicKey !== 'your_anthropic_api_key_here') {
-        return 'anthropic';
-      }
-    }
-    
+    if (hasNvidia) return 'nvidia';
+
     return 'mock';
   }
 
@@ -54,7 +160,7 @@ export class AIService {
     toolsUsed?: string[];
     activeBehavior?: string;
   }> {
-    // Use mock responses if Anthropic key not configured
+    // Use mock responses only when NVIDIA is not configured
     if (this.shouldUseMock()) {
       console.log('Using mock AI responses');
       const mockResponse = this.getMockResponse(message, behaviorId);
@@ -77,10 +183,12 @@ export class AIService {
     }
 
     const provider = this.getProvider();
-    
+
     if (provider === 'anthropic') {
       return this.sendMessageWithAnthropic(userId, message, behaviorId);
-    } else if (provider === 'kimi') {
+    }
+
+    if (provider === 'nvidia') {
       return this.sendMessageWithKimi(userId, message, behaviorId);
     } else {
       // Should not reach here due to shouldUseMock check, but just in case
@@ -113,113 +221,62 @@ export class AIService {
     toolsUsed?: string[];
     activeBehavior?: string;
   }> {
-    console.log('Using Anthropic Claude API with dynamic behaviors');
+    let activeBehaviorName = behaviorId;
+    let activeBehaviorId = behaviorId;
 
     try {
-      // Get chat history from Postgres
       const history = await postgresService.getChatHistory(userId, 10);
 
-      // Detect appropriate behavior based on user message and context
-      const behaviorDetection = await behaviorDetectionService.detectBehavior(
-        message,
-        userId,
-        history
-      );
+      const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
+      const explicitlySelectedBehavior =
+        requestedBehavior && requestedBehavior !== 'free-form-chat'
+          ? BEHAVIORS.find((behavior) => behavior.id === requestedBehavior)
+          : undefined;
 
-      const activeBehavior = behaviorDetection.behavior;
-      console.log(`🎯 Activated behavior: ${activeBehavior.name}`);
-      console.log(
-        `   Confidence: ${behaviorDetection.confidence.toFixed(2)}, Triggers: ${behaviorDetection.matchedTriggers.join(', ')}`
-      );
+      let activeBehavior = explicitlySelectedBehavior;
+      let behaviorConfidence = 1;
+      let matchedTriggers: string[] = ['explicit-selection'];
 
-      // Build messages array for Claude
-      const messages: any[] = [
+      if (!activeBehavior) {
+        const behaviorDetection = await behaviorDetectionService.detectBehavior(
+          message,
+          userId,
+          history
+        );
+        activeBehavior = behaviorDetection.behavior;
+        behaviorConfidence = behaviorDetection.confidence;
+        matchedTriggers = behaviorDetection.matchedTriggers;
+      }
+
+      activeBehaviorName = activeBehavior.name;
+      activeBehaviorId = activeBehavior.id;
+
+      const client = getAnthropicClient();
+      const anthropicMessages = [
         ...history.map((msg) => ({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
           content: msg.content,
         })),
         {
-          role: 'user',
+          role: 'user' as const,
           content: message,
         },
       ];
 
-      // Call Claude API with tools and dynamic behavior system prompt
-      let completion = await getAnthropicClient().messages.create({
+      const completion = await client.messages.create({
         model: ANTHROPIC_CONFIG.model,
         max_tokens: ANTHROPIC_CONFIG.maxTokens,
         system: activeBehavior.instructions.systemPrompt,
-        messages,
-        tools: aiTools,
+        messages: anthropicMessages as any,
       });
 
-      const toolsUsed: string[] = [];
-
-      // Handle tool use responses (Claude may use multiple tools)
-      while (completion.stop_reason === 'tool_use') {
-        // Find all tool use blocks in the response
-        const toolUses = completion.content.filter(
-          (block: any) => block.type === 'tool_use'
-        );
-
-        // Execute all tools
-        const toolResults = await Promise.all(
-          toolUses.map(async (toolUse: any) => {
-            console.log(`Executing tool: ${toolUse.name}`, toolUse.input);
-            toolsUsed.push(toolUse.name);
-
-            try {
-              const result = await aiToolsService.executeTool(
-                toolUse.name,
-                toolUse.input,
-                userId
-              );
-
-              return {
-                type: 'tool_result',
-                tool_use_id: toolUse.id,
-                content: JSON.stringify(result),
-              };
-            } catch (error: any) {
-              return {
-                type: 'tool_result',
-                tool_use_id: toolUse.id,
-                content: JSON.stringify({ error: error.message }),
-                is_error: true,
-              };
-            }
-          })
-        );
-
-        // Continue conversation with tool results
-        messages.push({
-          role: 'assistant',
-          content: completion.content,
-        });
-
-        messages.push({
-          role: 'user',
-          content: toolResults,
-        });
-
-        // Get next response from Claude with tool results
-        completion = await getAnthropicClient().messages.create({
-          model: ANTHROPIC_CONFIG.model,
-          max_tokens: ANTHROPIC_CONFIG.maxTokens,
-          system: this.getBehaviorPrompt(behaviorId),
-          messages,
-          tools: aiTools,
-        });
-      }
-
-      // Extract final text response
-      const textBlocks = completion.content.filter(
-        (block: any) => block.type === 'text'
-      );
       const assistantMessage =
-        textBlocks.length > 0 && 'text' in textBlocks[0] ? textBlocks[0].text : '';
+        ((completion.content as any[])
+          ?.filter((block) => block?.type === 'text')
+          ?.map((block) => block.text)
+          ?.join('\n')
+          ?.trim() as string) || "I'm here with you.";
 
-      // Save both messages to Postgres
       await postgresService.saveChatMessage({
         userId,
         role: 'user',
@@ -233,59 +290,48 @@ export class AIService {
         content: assistantMessage,
         behaviorId: activeBehavior.id,
         metadata: {
-          tokens:
-            completion.usage.input_tokens + completion.usage.output_tokens,
-          model: completion.model,
-          toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+          model: completion.model || ANTHROPIC_CONFIG.model,
           behaviorName: activeBehavior.name,
-          behaviorConfidence: behaviorDetection.confidence,
-          matchedTriggers: behaviorDetection.matchedTriggers,
+          behaviorConfidence,
+          matchedTriggers,
         },
       });
 
       return {
         content: assistantMessage,
         role: 'assistant',
-        toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
         activeBehavior: activeBehavior.name,
       };
     } catch (error: any) {
       console.error('Anthropic API Service Error:', error);
-      
-      // Check if it's an API error (e.g., insufficient credits, invalid API key)
-      const isAPIError = error?.error?.type === 'invalid_request_error' || 
-                        error?.error?.type === 'authentication_error' ||
-                        error?.error?.code === 'insufficient_quota' ||
-                        error?.message?.includes('credit') ||
-                        error?.message?.includes('API') ||
-                        error?.message?.includes('Anthropic');
-      
-      if (isAPIError) {
-        console.log('⚠️  Anthropic API error detected, falling back to mock responses');
-        console.log('   Error:', error?.error?.message || error?.message);
-        
-        // Still save the user message to database
-        try {
-          await postgresService.saveChatMessage({
-            userId,
-            role: 'user',
-            content: message,
-            behaviorId: behaviorId,
-          });
-        } catch (dbError) {
-          console.error('Failed to save user message:', dbError);
-        }
-        
-        // Return mock response with proper structure
-        const mockResponse = this.getMockResponse(message, behaviorId);
-        return {
-          ...mockResponse,
-          toolsUsed: undefined,
-          activeBehavior: behaviorId,
-        };
+      const fallbackContent =
+        "I'm having trouble reaching the AI service right now. Please try again in a moment.";
+
+      try {
+        await postgresService.saveChatMessage({
+          userId,
+          role: 'user',
+          content: message,
+          behaviorId: activeBehaviorId,
+        });
+        await postgresService.saveChatMessage({
+          userId,
+          role: 'assistant',
+          content: fallbackContent,
+          behaviorId: activeBehaviorId,
+          metadata: {
+            model: 'anthropic-fallback',
+          },
+        });
+      } catch (dbError) {
+        console.error('Failed to persist Anthropic fallback response:', dbError);
       }
-      
-      throw new Error('Failed to process message');
+
+      return {
+        content: fallbackContent,
+        role: 'assistant',
+        activeBehavior: activeBehaviorName,
+      };
     }
   }
 
@@ -301,21 +347,40 @@ export class AIService {
   }> {
     console.log('Using Kimi K2.5 API with dynamic behaviors');
 
+    let activeBehaviorName = behaviorId;
+    let activeBehaviorId = behaviorId;
+
     try {
       // Get chat history from Postgres
       const history = await postgresService.getChatHistory(userId, 10);
 
-      // Detect appropriate behavior based on user message and context
-      const behaviorDetection = await behaviorDetectionService.detectBehavior(
-        message,
-        userId,
-        history
-      );
+      const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
+      const explicitlySelectedBehavior =
+        requestedBehavior && requestedBehavior !== 'free-form-chat'
+          ? BEHAVIORS.find((behavior) => behavior.id === requestedBehavior)
+          : undefined;
 
-      const activeBehavior = behaviorDetection.behavior;
+      let activeBehavior = explicitlySelectedBehavior;
+      let behaviorConfidence = 1;
+      let matchedTriggers: string[] = ['explicit-selection'];
+
+      // If no explicit mode is selected (or unknown mode), detect behavior dynamically.
+      if (!activeBehavior) {
+        const behaviorDetection = await behaviorDetectionService.detectBehavior(
+          message,
+          userId,
+          history
+        );
+        activeBehavior = behaviorDetection.behavior;
+        behaviorConfidence = behaviorDetection.confidence;
+        matchedTriggers = behaviorDetection.matchedTriggers;
+      }
+
+      activeBehaviorName = activeBehavior.name;
+      activeBehaviorId = activeBehavior.id;
       console.log(`🎯 Activated behavior: ${activeBehavior.name}`);
       console.log(
-        `   Confidence: ${behaviorDetection.confidence.toFixed(2)}, Triggers: ${behaviorDetection.matchedTriggers.join(', ')}`
+        `   Confidence: ${behaviorConfidence.toFixed(2)}, Triggers: ${matchedTriggers.join(', ')}`
       );
 
       // Build messages array for Kimi (OpenAI-compatible format)
@@ -335,10 +400,11 @@ export class AIService {
       let completion: any;
 
       // Call Kimi API with tools and dynamic behavior system prompt
-      completion = await callKimiAPI(
+      completion = await this.callKimiWithRetry(
         messages,
         activeBehavior.instructions.systemPrompt,
-        aiTools
+        aiTools,
+        'initial'
       );
 
       // Handle tool calls (OpenAI format uses tool_calls in choices[0].message)
@@ -350,13 +416,21 @@ export class AIService {
         // Execute all tool calls
         const toolResults = await Promise.all(
           responseMessage.tool_calls.map(async (toolCall: any) => {
-            console.log(`Executing tool: ${toolCall.function.name}`, JSON.parse(toolCall.function.arguments || '{}'));
+            const rawArgs = toolCall.function.arguments || '{}';
+            let parsedArgs: Record<string, unknown> = {};
+            try {
+              parsedArgs = JSON.parse(rawArgs);
+            } catch (parseError) {
+              console.warn(`Invalid tool args for ${toolCall.function.name}; using empty args`);
+            }
+
+            console.log(`Executing tool: ${toolCall.function.name}`, parsedArgs);
             toolsUsed.push(toolCall.function.name);
 
             try {
               const result = await aiToolsService.executeTool(
                 toolCall.function.name,
-                JSON.parse(toolCall.function.arguments || '{}'),
+                parsedArgs,
                 userId
               );
 
@@ -385,10 +459,11 @@ export class AIService {
         messages.push(...toolResults);
 
         // Get next response from Kimi with tool results
-        completion = await callKimiAPI(
+        completion = await this.callKimiWithRetry(
           messages,
           activeBehavior.instructions.systemPrompt,
-          aiTools
+          aiTools,
+          'tool-followup'
         );
 
         responseMessage = completion.choices?.[0]?.message;
@@ -396,7 +471,7 @@ export class AIService {
       }
 
       // Extract final text response
-      assistantMessage = responseMessage?.content || '';
+      assistantMessage = responseMessage?.content || responseMessage?.reasoning || '';
 
       // Save both messages to Postgres
       await postgresService.saveChatMessage({
@@ -416,8 +491,8 @@ export class AIService {
           model: completion.model || getKimiConfig().model,
           toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
           behaviorName: activeBehavior.name,
-          behaviorConfidence: behaviorDetection.confidence,
-          matchedTriggers: behaviorDetection.matchedTriggers,
+            behaviorConfidence,
+            matchedTriggers,
         },
       });
 
@@ -428,42 +503,56 @@ export class AIService {
         activeBehavior: activeBehavior.name,
       };
     } catch (error: any) {
-      console.error('Kimi API Service Error:', error);
-      
-      // Check if it's an API error (e.g., insufficient credits, invalid API key)
-      const isAPIError = error?.error?.type === 'invalid_request_error' || 
-                        error?.error?.type === 'authentication_error' ||
-                        error?.error?.code === 'insufficient_quota' ||
-                        error?.message?.includes('credit') ||
-                        error?.message?.includes('API') ||
-                        error?.message?.includes('Kimi');
-      
-      if (isAPIError) {
-        console.log('⚠️  Kimi API error detected, falling back to mock responses');
-        console.log('   Error:', error?.error?.message || error?.message);
-        
-        // Still save the user message to database
-        try {
-          await postgresService.saveChatMessage({
-            userId,
-            role: 'user',
-            content: message,
-            behaviorId: behaviorId,
-          });
-        } catch (dbError) {
-          console.error('Failed to save user message:', dbError);
-        }
-        
-        // Return mock response with proper structure
-        const mockResponse = this.getMockResponse(message, behaviorId);
-        return {
-          ...mockResponse,
-          toolsUsed: undefined,
-          activeBehavior: behaviorId,
-        };
+      console.error('NVIDIA Kimi API Service Error:', error);
+      const category = this.classifyKimiError(error);
+
+      // Graceful fallback to avoid surfacing hard 500s for transient provider issues.
+      const fallbackByCategory: Record<KimiErrorCategory, string> = {
+        timeout:
+          "I'm still here - the AI provider took too long to respond. Please try sending that again in a few seconds.",
+        rate_limit:
+          "I'm receiving a lot of requests right now. Please wait a moment and send your message again.",
+        server:
+          "The AI provider is temporarily unavailable. Please try again shortly.",
+        network:
+          "There was a temporary network issue reaching the AI provider. Please try again in a moment.",
+        bad_request:
+          "I had trouble processing that request format. Please rephrase slightly and try again.",
+        auth:
+          "The AI service credentials are currently invalid. Please contact support or check server configuration.",
+        unknown:
+          "I hit an unexpected AI service issue. Please try again in a few seconds.",
+      };
+
+      const fallbackContent = fallbackByCategory[category] || fallbackByCategory.unknown;
+
+      try {
+        await postgresService.saveChatMessage({
+          userId,
+          role: 'user',
+          content: message,
+          behaviorId: activeBehaviorId,
+        });
+
+        await postgresService.saveChatMessage({
+          userId,
+          role: 'assistant',
+          content: fallbackContent,
+          behaviorId: activeBehaviorId,
+          metadata: {
+            model: 'nvidia-fallback',
+            errorCategory: category,
+          },
+        });
+      } catch (dbError) {
+        console.error('Failed to persist fallback chat response:', dbError);
       }
-      
-      throw new Error('Failed to process message');
+
+      return {
+        content: fallbackContent,
+        role: 'assistant',
+        activeBehavior: activeBehaviorName,
+      };
     }
   }
 

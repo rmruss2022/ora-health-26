@@ -28,12 +28,17 @@ interface GeneratedLetter {
 }
 
 export class AILetterGeneratorService {
-  private openai: OpenAI;
+  private openai: OpenAI | null;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey || apiKey === 'your_openai_api_key_here') {
+      this.openai = null;
+      console.warn('OPENAI_API_KEY not configured, using fallback daily letters');
+      return;
+    }
+
+    this.openai = new OpenAI({ apiKey });
   }
 
   /**
@@ -41,6 +46,10 @@ export class AILetterGeneratorService {
    */
   async generateDailyLetter(context: LetterGenerationContext): Promise<GeneratedLetter> {
     try {
+      if (!this.openai) {
+        return this.getFallbackLetter(context);
+      }
+
       const prompt = this.buildLetterPrompt(context);
 
       const response = await this.openai.chat.completions.create({

@@ -122,6 +122,51 @@ export class CommunityService {
     }));
   }
 
+  /**
+   * Create a post for a completed meditation session
+   */
+  async createMeditationPost(
+    userId: string,
+    durationMinutes: number,
+    emoji?: string,
+    authorName?: string
+  ): Promise<CommunityPost> {
+    const content = emoji
+      ? `Meditated for ${durationMinutes} minutes ${emoji}`
+      : `Completed a ${durationMinutes}-minute meditation`;
+
+    return await this.createPost(userId, {
+      type: 'progress',
+      category: 'meditation',
+      content,
+      tags: ['meditation', 'mindfulness'],
+      isAnonymous: false,
+      authorName,
+      authorAvatar: '🧘',
+    });
+  }
+
+  /**
+   * Create a post for a public reflection response
+   */
+  async createReflectionPost(
+    userId: string,
+    promptText: string,
+    responseText: string,
+    authorName?: string
+  ): Promise<CommunityPost> {
+    return await this.createPost(userId, {
+      type: 'prompt',
+      category: 'reflection',
+      content: responseText,
+      promptText,
+      tags: ['reflection', 'daily-prompt'],
+      isAnonymous: true, // Reflections are always anonymous
+      authorName: authorName || 'Anonymous',
+      authorAvatar: '✨',
+    });
+  }
+
   async createPost(
     userId: string,
     data: {
