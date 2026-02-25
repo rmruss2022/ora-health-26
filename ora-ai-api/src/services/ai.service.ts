@@ -1,4 +1,5 @@
 import { callKimiAPI, getKimiConfig } from '../config/kimi';
+import { getAnthropicClient, ANTHROPIC_CONFIG } from '../config/anthropic';
 import { postgresService } from './postgres.service';
 import { aiTools, aiToolsService } from './ai-tools.service';
 import { behaviorDetectionService } from './behavior-detection.service';
@@ -122,21 +123,25 @@ export class AIService {
     throw lastError instanceof Error ? lastError : new Error('Unknown Kimi API error');
   }
 
-  private getProvider(): 'nvidia' | 'mock' {
-    const provider = process.env.AI_PROVIDER?.toLowerCase() || 'nvidia';
+  private getProvider(): 'anthropic' | 'nvidia' | 'mock' {
+    const provider = process.env.AI_PROVIDER?.toLowerCase();
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const nvidiaKey = process.env.NVIDIA_API_KEY;
+    const hasAnthropic = !!anthropicKey && anthropicKey !== 'your_anthropic_api_key_here';
+    const hasNvidia = !!nvidiaKey && nvidiaKey !== 'your_nvidia_api_key_here';
 
-    // Treat legacy "kimi" provider as NVIDIA-hosted Kimi.
-    const providerIsNvidia = provider === 'nvidia' || provider === 'kimi';
-
-    // Force NVIDIA-only behavior. Any other configured provider is ignored.
-    if (!providerIsNvidia) {
-      console.warn(`AI_PROVIDER="${provider}" is not supported; forcing NVIDIA`);
+    // Prefer Anthropic when available to keep chat on Claude.
+    if (hasAnthropic) {
+      if (provider && provider !== 'anthropic') {
+        console.warn(`AI_PROVIDER="${provider}" overridden to Anthropic because ANTHROPIC_API_KEY is configured`);
+      }
+      return 'anthropic';
     }
 
-    if (nvidiaKey && nvidiaKey !== 'your_nvidia_api_key_here') {
-      return 'nvidia';
+    if (provider === 'anthropic' && !hasAnthropic) {
+      console.warn('AI_PROVIDER="anthropic" set but ANTHROPIC_API_KEY is missing; falling back');
     }
+    if (hasNvidia) return 'nvidia';
 
     return 'mock';
   }
@@ -178,7 +183,11 @@ export class AIService {
     }
 
     const provider = this.getProvider();
-    
+
+    if (provider === 'anthropic') {
+      return this.sendMessageWithAnthropic(userId, message, behaviorId);
+    }
+
     if (provider === 'nvidia') {
       return this.sendMessageWithKimi(userId, message, behaviorId);
     } else {
@@ -198,6 +207,130 @@ export class AIService {
         ...mockResponse,
         toolsUsed: undefined,
         activeBehavior: behaviorId,
+      };
+    }
+  }
+
+  private async sendMessageWithAnthropic(
+    userId: string,
+    message: string,
+    behaviorId: string
+  ): Promise<{
+    content: string;
+    role: string;
+    toolsUsed?: string[];
+    activeBehavior?: string;
+  }> {
+    let activeBehaviorName = behaviorId;
+    let activeBehaviorId = behaviorId;
+
+    try {
+      const history = await postgresService.getChatHistory(userId, 10);
+
+      const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
+      const explicitlySelectedBehavior =
+        requestedBehavior && requestedBehavior !== 'free-form-chat'
+          ? BEHAVIORS.find((behavior) => behavior.id === requestedBehavior)
+          : undefined;
+
+      let activeBehavior = explicitlySelectedBehavior;
+      let behaviorConfidence = 1;
+      let matchedTriggers: string[] = ['explicit-selection'];
+
+      if (!activeBehavior) {
+        const behaviorDetection = await behaviorDetectionService.detectBehavior(
+          message,
+          userId,
+          history
+        );
+        activeBehavior = behaviorDetection.behavior;
+        behaviorConfidence = behaviorDetection.confidence;
+        matchedTriggers = behaviorDetection.matchedTriggers;
+      }
+
+      activeBehaviorName = activeBehavior.name;
+      activeBehaviorId = activeBehavior.id;
+
+      const client = getAnthropicClient();
+      const anthropicMessages = [
+        ...history.map((msg) => ({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.content,
+        })),
+        {
+          role: 'user' as const,
+          content: message,
+        },
+      ];
+
+      const completion = await client.messages.create({
+        model: ANTHROPIC_CONFIG.model,
+        max_tokens: ANTHROPIC_CONFIG.maxTokens,
+        system: activeBehavior.instructions.systemPrompt,
+        messages: anthropicMessages as any,
+      });
+
+      const assistantMessage =
+        ((completion.content as any[])
+          ?.filter((block) => block?.type === 'text')
+          ?.map((block) => block.text)
+          ?.join('\n')
+          ?.trim() as string) || "I'm here with you.";
+
+      await postgresService.saveChatMessage({
+        userId,
+        role: 'user',
+        content: message,
+        behaviorId: activeBehavior.id,
+      });
+
+      await postgresService.saveChatMessage({
+        userId,
+        role: 'assistant',
+        content: assistantMessage,
+        behaviorId: activeBehavior.id,
+        metadata: {
+          model: completion.model || ANTHROPIC_CONFIG.model,
+          behaviorName: activeBehavior.name,
+          behaviorConfidence,
+          matchedTriggers,
+        },
+      });
+
+      return {
+        content: assistantMessage,
+        role: 'assistant',
+        activeBehavior: activeBehavior.name,
+      };
+    } catch (error: any) {
+      console.error('Anthropic API Service Error:', error);
+      const fallbackContent =
+        "I'm having trouble reaching the AI service right now. Please try again in a moment.";
+
+      try {
+        await postgresService.saveChatMessage({
+          userId,
+          role: 'user',
+          content: message,
+          behaviorId: activeBehaviorId,
+        });
+        await postgresService.saveChatMessage({
+          userId,
+          role: 'assistant',
+          content: fallbackContent,
+          behaviorId: activeBehaviorId,
+          metadata: {
+            model: 'anthropic-fallback',
+          },
+        });
+      } catch (dbError) {
+        console.error('Failed to persist Anthropic fallback response:', dbError);
+      }
+
+      return {
+        content: fallbackContent,
+        role: 'assistant',
+        activeBehavior: activeBehaviorName,
       };
     }
   }

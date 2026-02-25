@@ -10,5 +10,6 @@ router.post('/messages', chatController.sendMessage);
 router.get('/history', chatController.getChatHistory);
 router.post('/behavior', chatController.switchBehavior);
 router.get('/behavior', chatController.getCurrentBehavior);
+router.get('/personas', chatController.getPersonas);
 
 export default router;

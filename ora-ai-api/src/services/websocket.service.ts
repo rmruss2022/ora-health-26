@@ -530,6 +530,88 @@ export class WebSocketService {
 
     console.log(`[WebSocket] User ${userId} unsubscribed from collective session ${sessionId}`);
   }
+
+  /**
+   * Notify when a user joins a meditation room
+   */
+  notifyRoomUserJoined(roomId: string, participant: any, participantCount: number): void {
+    if (!this.io) return;
+
+    this.io.to(`room:${roomId}`).emit('room:user-joined', {
+      roomId,
+      participant,
+      participantCount,
+      timestamp: new Date(),
+    });
+
+    console.log(`[WebSocket] User ${participant.userId} joined room ${roomId}`);
+  }
+
+  /**
+   * Notify when a user leaves a meditation room
+   */
+  notifyRoomUserLeft(roomId: string, userId: string, participantCount: number): void {
+    if (!this.io) return;
+
+    this.io.to(`room:${roomId}`).emit('room:user-left', {
+      roomId,
+      userId,
+      participantCount,
+      timestamp: new Date(),
+    });
+
+    console.log(`[WebSocket] User ${userId} left room ${roomId}`);
+  }
+
+  /**
+   * Subscribe a user to a meditation room
+   */
+  subscribeToRoom(userId: string, roomId: string): void {
+    const socketIds = this.userSocketMap.get(userId);
+    if (!socketIds || !this.io) return;
+
+    for (const socketId of socketIds) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.join(`room:${roomId}`);
+      }
+    }
+
+    console.log(`[WebSocket] User ${userId} subscribed to room ${roomId}`);
+  }
+
+  /**
+   * Unsubscribe a user from a meditation room
+   */
+  unsubscribeFromRoom(userId: string, roomId: string): void {
+    const socketIds = this.userSocketMap.get(userId);
+    if (!socketIds || !this.io) return;
+
+    for (const socketId of socketIds) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.leave(`room:${roomId}`);
+      }
+    }
+
+    console.log(`[WebSocket] User ${userId} unsubscribed from room ${roomId}`);
+  }
+
+  /**
+   * Broadcast when a meditation starts in a room
+   */
+  notifyRoomMeditationStarted(roomId: string, meditation: any, participantCount: number): void {
+    if (!this.io) return;
+
+    this.io.to(`room:${roomId}`).emit('room:meditation-started', {
+      roomId,
+      meditation,
+      participantCount,
+      timestamp: new Date(),
+    });
+
+    console.log(`[WebSocket] Meditation started in room ${roomId}`);
+  }
 }
 
 // Singleton instance

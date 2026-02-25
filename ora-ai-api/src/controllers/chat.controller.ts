@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { aiService } from '../services/ai.service';
 import { postgresService } from '../services/postgres.service';
+import { PERSONAS } from '../config/behaviors';
 
 class ChatController {
   async sendMessage(req: AuthRequest, res: Response) {
@@ -62,6 +63,15 @@ class ChatController {
     } catch (error) {
       console.error('GetCurrentBehavior Error:', error);
       res.status(500).json({ error: 'Failed to get current behavior' });
+    }
+  }
+
+  async getPersonas(_req: AuthRequest, res: Response) {
+    try {
+      res.json(PERSONAS);
+    } catch (error) {
+      console.error('GetPersonas Error:', error);
+      res.status(500).json({ error: 'Failed to get personas' });
     }
   }
 }
