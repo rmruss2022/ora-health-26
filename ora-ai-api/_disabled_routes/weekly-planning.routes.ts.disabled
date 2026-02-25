@@ -1,0 +1,104 @@
+/**
+ * Weekly Planning API Routes
+ */
+
+import { Router } from 'express';
+import { authenticateToken, AuthRequest } from '../middleware/auth.middleware';
+import { weeklyPlanningService } from '../services/weekly-planning.service';
+
+const router = Router();
+
+/**
+ * POST /api/weekly-planning
+ * Save user's weekly plan
+ */
+router.post('/', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { intentions, goals } = req.body;
+
+    if (!intentions || intentions.trim().length === 0) {
+      return res.status(400).json({ error: 'Intentions are required' });
+    }
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const plan = await weeklyPlanningService.saveWeeklyPlan(
+      req.userId,
+      intentions.trim(),
+      goals
+    );
+
+    res.json({
+      success: true,
+      plan,
+    });
+  } catch (error: any) {
+    console.error('Error saving weekly plan:', error);
+    res.status(500).json({ error: error.message || 'Failed to save weekly plan' });
+  }
+});
+
+/**
+ * GET /api/weekly-planning
+ * Get user's weekly plans
+ */
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const limit = parseInt(req.query.limit as string) || 10;
+    const plans = await weeklyPlanningService.getUserWeeklyPlans(req.userId, limit);
+
+    res.json({ plans });
+  } catch (error: any) {
+    console.error('Error fetching weekly plans:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch weekly plans' });
+  }
+});
+
+/**
+ * GET /api/weekly-planning/current
+ * Get current week's plan
+ */
+router.get('/current', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const plan = await weeklyPlanningService.getCurrentWeekPlan(req.userId);
+
+    res.json({ plan });
+  } catch (error: any) {
+    console.error('Error fetching current week plan:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch current week plan' });
+  }
+});
+
+/**
+ * POST /api/weekly-planning/send-prompt
+ * Manually trigger planning prompt for current user (testing)
+ */
+router.post('/send-prompt', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const sent = await weeklyPlanningService.sendPlanningPrompt(req.userId);
+
+    res.json({
+      success: sent,
+      message: sent ? 'Planning prompt sent' : 'Failed to send planning prompt',
+    });
+  } catch (error: any) {
+    console.error('Error sending planning prompt:', error);
+    res.status(500).json({ error: error.message || 'Failed to send planning prompt' });
+  }
+});
+
+export default router;

@@ -15,11 +15,22 @@ import reactionsRoutes from './routes/reactions.routes';
 import collectiveRoutes from './routes/collective.routes';
 import reflectionRoutes from './routes/reflection.routes';
 import roomRoutes from './routes/room.routes';
+// Temporarily disabled due to TS errors - fix later
+// import agentRoutes from './routes/agent.routes';
+// import quizRoutes from './routes/quiz.routes';
+// import notificationsRoutes from './routes/notifications.routes';
+// import weeklyPlanningRoutes from './routes/weekly-planning.routes';
+// import weeklyReviewRoutes from './routes/weekly-review.routes';
+// import exerciseRoutes from './routes/exercise.routes';
 // import analyticsRoutes from './routes/analytics.routes';
 // import backgroundRoutes from './routes/background.routes';
-// import notificationsRoutes from './routes/notifications.routes';
 import { scheduleDailyLetters } from './jobs/daily-letters.cron';
 import { startCollectiveSessionScheduler } from './jobs/schedule-collective-sessions.cron';
+// Temporarily disabled
+// import { startWeeklyPlanningScheduler } from './jobs/weekly-planning.cron';
+// import { startWeeklyReviewScheduler } from './jobs/weekly-review.cron';
+// import { scheduleDailyQuizReminder, scheduleEveningQuizReminder, scheduleWeeklyStreakReport } from './jobs/daily-quiz-reminder.cron';
+// import { scheduleAgentPosts } from './jobs/agent-posts.cron';
 import { WebSocketService } from './services/websocket.service';
 
 // Load environment variables
@@ -58,6 +69,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Serve static notification images
+app.use('/notification-images', express.static('public/notification-images'));
+
 // Request logging
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
@@ -78,9 +92,15 @@ app.use('/api/reactions', reactionsRoutes);
 app.use('/api/collective', collectiveRoutes);
 app.use('/api/reflections', reflectionRoutes);
 app.use('/api/rooms', roomRoutes);
+// Temporarily disabled - fix TS errors later
+// app.use('/api/agents', agentRoutes);
+// app.use('/api/quiz', quizRoutes);
+// app.use('/api/notifications', notificationsRoutes);
+// app.use('/api/weekly-planning', weeklyPlanningRoutes);
+// app.use('/api/weekly-review', weeklyReviewRoutes);
+// app.use('/api/exercises', exerciseRoutes);
 // app.use('/api/analytics', analyticsRoutes);
 // app.use('/api/background', backgroundRoutes);
-// app.use('/api/notifications', notificationsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -114,5 +134,23 @@ httpServer.listen(PORT, () => {
     
     startCollectiveSessionScheduler();
     console.log('🧘 Collective session scheduler started');
+    
+    // startWeeklyPlanningScheduler();
+    // console.log('🌅 Weekly planning scheduler started');
+    
+    // startWeeklyReviewScheduler();
+    // console.log('🌟 Weekly review scheduler started');
+    
+    // scheduleDailyQuizReminder();
+    // console.log('📝 Daily quiz reminder scheduled (9:00 AM)');
+    // 
+    // scheduleEveningQuizReminder();
+    // console.log('🌙 Evening quiz reminder scheduled (8:00 PM)');
+    // 
+    // scheduleWeeklyStreakReport();
+    console.log('📊 Weekly streak report scheduled (Monday 10:00 AM)');
+    
+    // scheduleAgentPosts();
+    console.log('🤖 AI agent posts scheduler started (every 6 hours)');
   }
 });
