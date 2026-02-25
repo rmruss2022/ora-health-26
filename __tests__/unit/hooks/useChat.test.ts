@@ -22,7 +22,7 @@ describe('useChat', () => {
       expect(result.current.messages[0]).toMatchObject({
         id: 'welcome',
         role: 'assistant',
-        content: expect.stringContaining("Hello! I'm Shadow AI"),
+        content: expect.stringContaining("Hello! I'm Ora"),
       });
       expect(result.current.isLoading).toBe(false);
       expect(result.current.error).toBe(null);
@@ -46,14 +46,14 @@ describe('useChat', () => {
       const { result } = renderHook(() => useChat('unknown-behavior'));
 
       expect(result.current.messages).toHaveLength(1);
-      expect(result.current.messages[0].content).toContain("Hello! I'm Shadow AI");
+      expect(result.current.messages[0].content).toContain("Hello! I'm Ora");
     });
 
     it('should default to free-form-chat if no behavior provided', () => {
       const { result } = renderHook(() => useChat());
 
       expect(result.current.messages).toHaveLength(1);
-      expect(result.current.messages[0].content).toContain("Hello! I'm Shadow AI");
+      expect(result.current.messages[0].content).toContain("Hello! I'm Ora");
     });
   });
 

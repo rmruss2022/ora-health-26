@@ -9,7 +9,7 @@ interface Message {
 }
 
 const welcomeMessages: Record<string, string> = {
-  'free-form-chat': "Hello! I'm Shadow AI, your companion for personal growth and reflection. I'm here to listen, guide, and support you. What's on your mind today?",
+  'free-form-chat': "Hello! I'm Ora, your companion for personal growth and reflection. I'm here to listen, guide, and support you. What's on your mind today?",
   'journal-prompt': "Welcome to your journaling session. Let's explore your thoughts and experiences together. What would you like to reflect on today?",
   'guided-exercise': "Welcome! I'm here to guide you through personal growth exercises. What area would you like to focus on: gratitude, cognitive reframing, or values clarification?",
   'progress-analysis': "Hello! I'm here to help you understand your personal growth journey. Share your recent experiences and I'll provide insights on your progress.",
@@ -18,21 +18,30 @@ const welcomeMessages: Record<string, string> = {
   'self-compassion-exercise': "Welcome. We'll do a gentle guided exercise to reduce stress and self-criticism. What feels most intense for you right now?",
 };
 
-export const useChat = (behaviorId: string = 'free-form-chat') => {
+const personaWelcomeMessages: Record<string, string> = {
+  'persona-ora': "Hey. I'm Ora \u2014 your space to breathe, reflect, and find your way. What's on your mind today?",
+  'persona-genz': "heyyy bestie \ud83d\udc4b i'm Sage. no judgment zone, only vibes here. what's going on fr?",
+  'persona-psychotherapist': "Hello, I'm Dr. Avery. I'm glad you're here. Take whatever time you need \u2014 I'm curious to understand what brings you in today.",
+};
+
+export const useChat = (behaviorId: string = 'free-form-chat', personaId: string = 'persona-ora') => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Set initial welcome message based on behavior
+    // Set initial welcome message based on persona (if set) or behavior
+    const content = personaWelcomeMessages[personaId]
+      || welcomeMessages[behaviorId]
+      || welcomeMessages['free-form-chat'];
     const welcomeMessage: Message = {
       id: 'welcome',
       role: 'assistant',
-      content: welcomeMessages[behaviorId] || welcomeMessages['free-form-chat'],
+      content,
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
-  }, [behaviorId]);
+  }, [behaviorId, personaId]);
 
   const sendMessage = useCallback(async (text: string) => {
     // Add user message immediately
@@ -48,10 +57,10 @@ export const useChat = (behaviorId: string = 'free-form-chat') => {
     setError(null);
 
     try {
-      // Call the backend API
+      // Call the backend API with persona override
       const response = await chatAPI.sendMessage({
         content: text,
-        behaviorId: behaviorId,
+        behaviorId: personaId,
       });
 
       // Add AI response
@@ -78,7 +87,7 @@ export const useChat = (behaviorId: string = 'free-form-chat') => {
     } finally {
       setIsLoading(false);
     }
-  }, [behaviorId]);
+  }, [personaId]);
 
   return {
     messages,

@@ -21,6 +21,9 @@ export const useFonts = () => {
     async function loadFonts() {
       try {
         await Font.loadAsync({
+          // Script Font (Personal greeting)
+          'Allura-Regular': require('../../assets/fonts/Allura-Regular.ttf'),
+
           // Sentient Font Family (Primary - Display & Body)
           'Sentient-Extralight': require('../../assets/fonts/Sentient-Extralight.otf'),
           'Sentient-ExtralightItalic': require('../../assets/fonts/Sentient-ExtralightItalic.otf'),
@@ -78,6 +81,7 @@ export const useCustomFonts = () => {
     async function loadFonts() {
       try {
         await Font.loadAsync({
+          'Allura-Regular': require('../../assets/fonts/Allura-Regular.ttf'),
           'Sentient-Extralight': require('../../assets/fonts/Sentient-Extralight.otf'),
           'Sentient-ExtralightItalic': require('../../assets/fonts/Sentient-ExtralightItalic.otf'),
           'Sentient-Light': require('../../assets/fonts/Sentient-Light.otf'),

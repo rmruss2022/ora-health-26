@@ -6,7 +6,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Image,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
 import { communityAPI } from '../services/api/communityAPI';
 import { categoriesAPI } from '../services/api/categoriesAPI';
@@ -14,102 +24,113 @@ import { inboxAPI } from '../services/api/inboxAPI';
 import { CommunityPost, PostCategory, InboxMessage } from '../types';
 import { PostCard } from '../components/community/PostCard';
 import { CategoryFilter } from '../components/community/CategoryFilter';
-import { useAuth } from '../context/AuthContext';
-
-const feedTabs = [
-  { id: 'inbox', label: 'Inbox' },
-  { id: 'home', label: 'For You' },
-  { id: 'letters', label: 'Letters' },
-  { id: 'prompts', label: 'Prompts' },
-];
-
-const postTypeIcons: Record<string, string> = {
-  progress: '🎯',
-  prompt: '💭',
-  resource: '📚',
-  support: '🤝',
-  gratitude: '💙',
-};
-
-const promptCategories = [
-  { id: 'reflection', label: 'Reflection', icon: '🪞', color: '#E8D5FF' },
-  { id: 'growth', label: 'Growth', icon: '🌱', color: '#D4F1E8' },
-  { id: 'wellness', label: 'Wellness', icon: '💚', color: '#E3F4D7' },
-  { id: 'creativity', label: 'Creativity', icon: '🎨', color: '#FFE8D5' },
-  { id: 'connection', label: 'Connection', icon: '🤝', color: '#FFD5E8' },
-  { id: 'gratitude', label: 'Gratitude', icon: '💙', color: '#D5E8FF' },
-];
-
-const communityPrompts = [
-  {
-    id: '1',
-    category: 'reflection',
-    text: 'What small habit has made a big impact on your life?',
-    responseCount: 47,
-    isActive: true,
-  },
-  {
-    id: '2',
-    category: 'growth',
-    text: 'Share a challenge you overcame recently and what you learned',
-    responseCount: 32,
-    isActive: true,
-  },
-  {
-    id: '3',
-    category: 'wellness',
-    text: 'What does self-care look like for you today?',
-    responseCount: 28,
-    isActive: true,
-  },
-  {
-    id: '4',
-    category: 'creativity',
-    text: 'Describe a moment when you felt truly creative',
-    responseCount: 19,
-    isActive: false,
-  },
-  {
-    id: '5',
-    category: 'connection',
-    text: 'How has someone in your life positively influenced you?',
-    responseCount: 53,
-    isActive: true,
-  },
-  {
-    id: '6',
-    category: 'gratitude',
-    text: 'Name three things you are grateful for this week',
-    responseCount: 61,
-    isActive: true,
-  },
-  {
-    id: '7',
-    category: 'reflection',
-    text: 'What would you tell your younger self?',
-    responseCount: 44,
-    isActive: false,
-  },
-  {
-    id: '8',
-    category: 'growth',
-    text: 'What skill or habit are you working on developing?',
-    responseCount: 35,
-    isActive: true,
-  },
-];
 
 interface CommunityScreenProps {
   navigation: any;
 }
 
+const FALLBACK_LETTERS: InboxMessage[] = [
+  {
+    id: 'fallback-letter-1',
+    userId: 'demo-user',
+    messageType: 'encouragement',
+    subject: 'A gentle reminder',
+    content: 'Small acts done consistently can shift your whole week. Keep showing up for yourself.',
+    isRead: false,
+    isArchived: false,
+    timestamp: '2h ago',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'fallback-letter-2',
+    userId: 'demo-user',
+    messageType: 'insight',
+    subject: 'Community insight',
+    content: 'Most members who complete 5-minute sessions report feeling calmer by day three.',
+    isRead: true,
+    isArchived: false,
+    timestamp: 'Yesterday',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'fallback-letter-3',
+    userId: 'demo-user',
+    messageType: 'community_highlight',
+    subject: 'From the circle',
+    content: '“I no longer wait for motivation. I just begin with one mindful breath.”',
+    isRead: true,
+    isArchived: false,
+    timestamp: '3d ago',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+const FALLBACK_CATEGORIES: PostCategory[] = [
+  { id: 'reflection', name: 'Reflection', description: 'Reflective conversations', icon: '💭', color: '#7C3AED', displayOrder: 1 },
+  { id: 'growth', name: 'Growth', description: 'Growth milestones', icon: '🌱', color: '#16A34A', displayOrder: 2 },
+  { id: 'wellness', name: 'Wellness', description: 'Well-being and balance', icon: '💚', color: '#0D9488', displayOrder: 3 },
+  { id: 'support', name: 'Support', description: 'Community support', icon: '🤝', color: '#DB2777', displayOrder: 4 },
+  { id: 'gratitude', name: 'Gratitude', description: 'Gratitude moments', icon: '🙏', color: '#2563EB', displayOrder: 5 },
+];
+
+const FALLBACK_POSTS: CommunityPost[] = [
+  {
+    id: 'fallback-post-1',
+    userId: 'demo-user-1',
+    author: { name: 'Kai', avatar: 'K', isAnonymous: true },
+    type: 'progress',
+    category: 'growth',
+    content: 'Finished 7 straight days of short evening sessions. The consistency is finally clicking.',
+    tags: ['streak', 'evening'],
+    likes: 18,
+    comments: 6,
+    timestamp: '1h ago',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'fallback-post-2',
+    userId: 'demo-user-2',
+    author: { name: 'Mira', avatar: 'M', isAnonymous: true },
+    type: 'support',
+    category: 'support',
+    content: 'If anyone feels scattered today, try 10 box breaths before opening messages. It helped me reset.',
+    tags: ['support', 'breathwork'],
+    likes: 27,
+    comments: 12,
+    timestamp: '3h ago',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'fallback-post-3',
+    userId: 'demo-user-3',
+    author: { name: 'Noah', avatar: 'N', isAnonymous: true },
+    type: 'gratitude',
+    category: 'gratitude',
+    content: 'Grateful for this space. Showing up for five minutes this morning changed my whole mood.',
+    tags: ['gratitude', 'morning'],
+    likes: 21,
+    comments: 5,
+    timestamp: 'Yesterday',
+    createdAt: new Date().toISOString(),
+  },
+];
+
 export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) => {
-  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [letters, setLetters] = useState<InboxMessage[]>([]);
   const [categories, setCategories] = useState<PostCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [openedLetters, setOpenedLetters] = useState<Set<string>>(
+    new Set(letters.filter(l => l.isRead).map(l => l.id))
+  );
+
+  const handleLetterPress = (message: InboxMessage) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpenedLetters(prev => new Set(prev).add(message.id));
+    navigation.navigate('LetterDetail', { letter: message });
+  };
 
   useEffect(() => {
     loadLetters();
@@ -120,18 +141,20 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
   const loadLetters = async () => {
     try {
       const result = await inboxAPI.getMessages(false, 4, 0);
-      setLetters(result.messages);
+      setLetters(result.messages.length > 0 ? result.messages : FALLBACK_LETTERS);
     } catch (error) {
       console.error('Error loading letters:', error);
+      setLetters(FALLBACK_LETTERS);
     }
   };
 
   const loadCategories = async () => {
     try {
       const data = await categoriesAPI.getCategories();
-      setCategories(data);
+      setCategories(data.length > 0 ? data : FALLBACK_CATEGORIES);
     } catch (error) {
       console.error('Error loading categories:', error);
+      setCategories(FALLBACK_CATEGORIES);
     }
   };
 
@@ -149,9 +172,16 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
         }
         return (b.likes || 0) - (a.likes || 0);
       });
-      setPosts(sortedPosts);
+      const fallbackForCategory = selectedCategory
+        ? FALLBACK_POSTS.filter((post) => post.category === selectedCategory)
+        : FALLBACK_POSTS;
+      setPosts(sortedPosts.length > 0 ? sortedPosts : fallbackForCategory);
     } catch (error) {
       console.error('Error loading posts:', error);
+      const fallbackForCategory = selectedCategory
+        ? FALLBACK_POSTS.filter((post) => post.category === selectedCategory)
+        : FALLBACK_POSTS;
+      setPosts(fallbackForCategory);
     } finally {
       setLoading(false);
     }
@@ -181,27 +211,28 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>Community</Text>
-          <View style={styles.headerMedallion}>
-            <View style={styles.headerMedallionInner}>
-              <Text style={styles.headerMedallionGlyph}>◉</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTitleRow}>
+            <LinearGradient
+              colors={['#D4B8E8', '#F8C8DC']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.headerOrb}
+            />
+            <View>
+              <Text style={styles.headerTitle}>Ora Club Community</Text>
+              <Text style={styles.headerSubtitle}>Share your journey, lift each other</Text>
             </View>
-            <View style={styles.headerMedallionOrbit} />
           </View>
+          <TouchableOpacity
+            style={styles.newPostButton}
+            onPress={() => navigation.navigate('CreatePost')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.newPostIcon}>+</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.headerSubtitle}>Share your journey, support others</Text>
-      </View>
-
-      <View style={styles.actionsBar}>
-        <TouchableOpacity
-          style={styles.newPostButton}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('CreatePost')}
-        >
-          <Text style={styles.newPostIcon}>+</Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -209,73 +240,93 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionTitle}>Letters</Text>
-        {letters.length === 0 ? (
-          <View style={styles.emptyInlineCard}>
-            <Text style={styles.emptyInlineText}>No letters yet. New reflections will appear here.</Text>
-          </View>
-        ) : (
-          letters.map((message) => (
-            <View key={message.id} style={styles.letterCard}>
-              <View style={styles.letterHeader}>
-                <Text style={styles.letterSubject}>{message.subject || 'Letter'}</Text>
-                <Text style={styles.letterTime}>{message.timestamp}</Text>
-              </View>
-              <Text style={styles.letterBody} numberOfLines={3}>
-                {message.content}
-              </Text>
-            </View>
-          ))
-        )}
-
-        <TouchableOpacity style={styles.promptBanner} activeOpacity={0.8}>
-          <View style={styles.promptIconContainer}>
-            <Text style={styles.promptIcon}>✨</Text>
-          </View>
-          <View style={styles.promptContent}>
-            <Text style={styles.promptLabel}>This Week's Prompt</Text>
-            <Text style={styles.promptText}>What small habit has made a big impact?</Text>
-          </View>
-          <Text style={styles.promptArrow}>→</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Community Conversations</Text>
-        <CategoryFilter
-          selectedCategory={selectedCategory as any}
-          onSelectCategory={handleCategorySelect}
-        />
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        ) : posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🤝</Text>
-            <Text style={styles.emptyTitle}>No posts yet</Text>
-            <Text style={styles.emptyText}>
-              Be the first to share your journey with the community
-            </Text>
-            <TouchableOpacity
-              style={styles.emptyButton}
-              onPress={() => navigation.navigate('CreatePost')}
-            >
-              <Text style={styles.emptyButtonText}>Create Post</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          posts.map((post) => {
-            const category = categories.find(c => c.id === post.category);
+        <View style={styles.sectionContainer}>
+          <Text style={styles.circleTitle}>Letters</Text>
+          {(() => {
+            const currentLetter = letters.find(l => !openedLetters.has(l.id));
+            if (!currentLetter) {
+              return (
+                <View style={styles.emptyInlineCard}>
+                  <Text style={styles.emptyInlineText}>You're all caught up.</Text>
+                </View>
+              );
+            }
             return (
-              <PostCard
-                key={post.id}
-                post={post}
-                category={category}
-                onPress={() => handleComment(post.id)}
-              />
+              <TouchableOpacity
+                style={styles.letterCard}
+                onPress={() => handleLetterPress(currentLetter)}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#2D6A4F', '#52B788']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.inboxGradientContainer}
+                >
+                  <Image
+                    source={require('../../assets/icons/letter-sealed.jpg')}
+                    style={styles.letterEnvelopeIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.letterSubject}>
+                    {currentLetter.subject || 'Letter'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
             );
-          })
-        )}
+          })()}
+
+          <TouchableOpacity style={styles.promptBanner} activeOpacity={0.8}>
+            <View style={styles.promptIconContainer}>
+              <Text style={styles.promptIcon}>✨</Text>
+            </View>
+            <View style={styles.promptContent}>
+              <Text style={styles.promptLabel}>This Week's Prompt</Text>
+              <Text style={styles.promptText}>What small habit has made a big impact?</Text>
+            </View>
+            <Text style={styles.promptArrow}>→</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sectionContainer}>
+          <Text style={styles.circleTitle}>Community Conversations</Text>
+          <CategoryFilter
+            selectedCategory={selectedCategory as any}
+            onSelectCategory={handleCategorySelect}
+          />
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+          ) : posts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🤝</Text>
+              <Text style={styles.emptyTitle}>No posts yet</Text>
+              <Text style={styles.emptyText}>
+                Be the first to share your journey with the community
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyButton}
+                onPress={() => navigation.navigate('CreatePost')}
+              >
+                <Text style={styles.emptyButtonText}>Create Post</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            posts.map((post) => {
+              const category = categories.find(c => c.id === post.category);
+              return (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  category={category}
+                  onPress={() => handleComment(post.id)}
+                />
+              );
+            })
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -284,121 +335,152 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECECEC',
+    backgroundColor: '#FAF8F3',
   },
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FAF8F3',
   },
   loadingText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.md,
+    fontFamily: 'System',
+    fontSize: 14,
+    color: '#8A8A8A',
+    marginTop: 16,
   },
   header: {
-    backgroundColor: '#D2CCAB',
-    paddingTop: 60,
-    paddingBottom: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.lg,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FAF8F3',
   },
-  headerTitle: {
-    ...theme.typography.h1,
-    color: theme.colors.textPrimary,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    flex: 1,
   },
-  headerMedallion: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E6E1C5',
-    borderWidth: 1,
-    borderColor: '#A9AD84',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    shadowColor: '#4A4A3A',
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+  headerOrb: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    marginRight: 12,
   },
-  headerMedallionInner: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#F1EEDC',
-    borderWidth: 1,
-    borderColor: '#B9BD98',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerMedallionGlyph: {
-    fontSize: 12,
-    color: '#5F6A52',
-  },
-  headerMedallionOrbit: {
-    position: 'absolute',
-    right: -2,
-    top: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#7D8568',
-    borderWidth: 1,
-    borderColor: '#E6E1C5',
+  headerTitle: {
+    fontFamily: 'System',
+    fontSize: 28,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+    color: '#2D2D2D',
   },
   headerSubtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-  },
-  actionsBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    backgroundColor: '#F6F5F1',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#D6D1C5',
+    fontFamily: 'System',
+    fontSize: 13,
+    color: '#8A8A8A',
+    marginTop: 2,
   },
   newPostButton: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: '#5C6C57',
+    minWidth: 68,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(163, 163, 163, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.lg,
+    backgroundColor: 'transparent',
   },
   newPostIcon: {
-    fontSize: 24,
-    color: theme.colors.white,
+    fontSize: 22,
+    color: '#1d473e',
     fontWeight: '300',
+    lineHeight: 24,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  sectionContainer: {
+    borderRadius: 20,
+    padding: 0,
+    marginBottom: 20,
+    backgroundColor: 'transparent',
+  },
+  inboxGradientContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 20,
+  },
+  circleTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.lavender,
+    marginBottom: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(163, 163, 163, 0.45)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  letterCard: {
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    borderWidth: 0,
+    marginBottom: 10,
+  },
+  letterEnvelopeIcon: {
+    width: 110,
+    height: 110,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  letterSubject: {
+    fontFamily: 'Sentient-LightItalic',
+    fontSize: 16,
+    color: '#2D2D2D',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  emptyInlineCard: {
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(163,163,163,0.35)',
+    padding: 16,
+  },
+  emptyInlineText: {
+    fontFamily: 'System',
+    fontSize: 14,
+    color: '#8A8A8A',
   },
   promptBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EBE6D0',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    borderRadius: theme.borderRadius.xl,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#D2C78F',
+    borderColor: 'rgba(212,184,232,0.45)',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
   },
   promptIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.white,
+    borderRadius: 20,
+    backgroundColor: '#D4B8E8',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    marginRight: 12,
   },
   promptIcon: {
     fontSize: 20,
@@ -407,359 +489,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   promptLabel: {
-    ...theme.typography.tiny,
-    fontWeight: '600',
-    color: '#5C542E',
+    fontFamily: 'System',
+    fontSize: 11,
+    letterSpacing: 1,
     textTransform: 'uppercase',
+    color: '#1d473e',
     marginBottom: 2,
+    fontWeight: '600',
   },
   promptText: {
-    ...theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
+    fontFamily: 'System',
+    fontSize: 15,
+    color: '#2D2D2D',
   },
   promptArrow: {
     fontSize: 24,
-    color: '#70693B',
-    marginLeft: theme.spacing.xs,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: theme.spacing.lg,
-  },
-  sectionTitle: {
-    ...theme.typography.h4,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
-  },
-  letterCard: {
-    backgroundColor: '#F7F5EE',
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: '#D8D3C8',
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  letterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  letterSubject: {
-    ...theme.typography.body,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-    flex: 1,
-    marginRight: theme.spacing.sm,
-  },
-  letterTime: {
-    ...theme.typography.small,
-    color: theme.colors.textTertiary,
-  },
-  letterBody: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    lineHeight: 20,
-  },
-  emptyInlineCard: {
-    backgroundColor: '#F7F5EE',
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: '#D8D3C8',
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  emptyInlineText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
+    color: '#1d473e',
+    marginLeft: 8,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.xxxl,
+    paddingVertical: 48,
   },
   emptyIcon: {
     fontSize: 64,
-    marginBottom: theme.spacing.md,
+    marginBottom: 16,
   },
   emptyTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.sm,
+    fontFamily: 'System',
+    fontSize: 20,
+    fontWeight: '300',
+    color: '#2D2D2D',
+    marginBottom: 8,
   },
   emptyText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
+    fontFamily: 'System',
+    fontSize: 14,
+    color: '#8A8A8A',
     textAlign: 'center',
-    marginBottom: theme.spacing.lg,
+    marginBottom: 20,
   },
   emptyButton: {
-    backgroundColor: '#5C6C57',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.full,
+    backgroundColor: '#1d473e',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
   },
   emptyButtonText: {
-    ...theme.typography.body,
-    color: theme.colors.textLight,
-    fontWeight: '600',
-  },
-  placeholderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.xxxl,
-  },
-  placeholderText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-  },
-  // Prompts Tab Styles
-  promptsTabContainer: {
-    flex: 1,
-  },
-  promptCategoriesScroll: {
-    backgroundColor: '#F6F5F1',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    flexGrow: 0,
-    maxHeight: 64,
-  },
-  promptCategoriesContent: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.xs,
-    alignItems: 'center',
-  },
-  promptCategoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.backgroundLight,
-    marginRight: theme.spacing.xs,
-    gap: 6,
-  },
-  promptCategoryChipActive: {
-    backgroundColor: '#606A4A',
-  },
-  promptCategoryChipIcon: {
-    fontSize: 16,
-  },
-  promptCategoryChipText: {
-    ...theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-  promptCategoryChipTextActive: {
-    color: theme.colors.textLight,
-  },
-  promptsListScroll: {
-    flex: 1,
-  },
-  promptCard: {
-    backgroundColor: '#F7F5EE',
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.sm,
-    borderWidth: 1,
-    borderColor: '#D8D3C8',
-  },
-  promptCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.sm,
-  },
-  promptCategoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
-    gap: 4,
-  },
-  promptCategoryBadgeIcon: {
+    fontFamily: 'System',
     fontSize: 14,
-  },
-  promptCategoryBadgeText: {
-    ...theme.typography.small,
+    color: '#FFFFFF',
     fontWeight: '600',
-    color: theme.colors.textPrimary,
-  },
-  activePromptBadge: {
-    backgroundColor: '#7B845F',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
-  },
-  activePromptBadgeText: {
-    ...theme.typography.tiny,
-    fontWeight: '700',
-    color: theme.colors.textLight,
-    textTransform: 'uppercase',
-  },
-  promptCardText: {
-    ...theme.typography.h4,
-    color: theme.colors.textPrimary,
-    lineHeight: 24,
-    marginBottom: theme.spacing.sm,
-  },
-  promptCardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  promptResponseCount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  promptResponseIcon: {
-    fontSize: 16,
-  },
-  promptResponseCountText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  promptCardArrow: {
-    fontSize: 20,
-    color: theme.colors.textTertiary,
-  },
-  // Legacy styles kept for reference, now using PostCard component
-  postCard: {
-    backgroundColor: '#F7F5EE',
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.sm,
-    borderWidth: 1,
-    borderColor: '#D8D3C8',
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  authorAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.backgroundGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: theme.spacing.sm,
-  },
-  avatarText: {
-    fontSize: 20,
-  },
-  postHeaderInfo: {
-    flex: 1,
-  },
-  postHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  authorName: {
-    ...theme.typography.h4,
-    color: theme.colors.textPrimary,
-  },
-  postType: {
-    fontSize: 16,
-  },
-  timestamp: {
-    ...theme.typography.small,
-    color: theme.colors.textTertiary,
-    marginTop: 2,
-  },
-  promptContext: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.backgroundLight,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-    marginBottom: theme.spacing.sm,
-  },
-  promptContextIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  promptContextText: {
-    ...theme.typography.small,
-    color: theme.colors.textSecondary,
-    fontStyle: 'italic',
-    flex: 1,
-  },
-  postContent: {
-    ...theme.typography.body,
-    color: theme.colors.textPrimary,
-    lineHeight: 22,
-    marginBottom: theme.spacing.sm,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: theme.spacing.sm,
-  },
-  tag: {
-    backgroundColor: theme.colors.backgroundGray,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
-  },
-  tagText: {
-    ...theme.typography.small,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  postActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionIcon: {
-    fontSize: 18,
-  },
-  actionText: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  actionTextActive: {
-    color: theme.colors.accent,
-    fontWeight: '600',
-  },
-  lettersContainer: {
-    padding: theme.spacing.lg,
-  },
-  lettersTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.xs,
-  },
-  lettersSubtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xl,
   },
 });

@@ -39,7 +39,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isLoading, placeho
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
-          placeholderTextColor="#999"
+          placeholderTextColor="#A8A49C"
           multiline
           maxLength={1000}
           editable={!isLoading}
@@ -77,11 +77,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isLoading, placeho
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FAF8F3',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderTopColor: 'rgba(180,170,155,0.3)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -92,23 +92,26 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 40,
     maxHeight: 120,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(180,170,155,0.4)',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 16,
-    color: '#000',
+    fontFamily: 'System',
+    fontSize: 15,
+    color: '#2D2D2D',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2d5e52',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1d473e',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   sendIcon: {
     width: 20,

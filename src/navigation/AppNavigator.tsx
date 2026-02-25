@@ -5,10 +5,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { ChatScreen } from '../screens/ChatScreen';
-import { MeditationScreen } from '../screens/MeditationScreen';
 import { MeditationTimerScreen } from '../screens/MeditationTimerScreen';
-import { CollectiveSessionScreen } from '../screens/CollectiveSessionScreen';
-import { DailyReflectionScreen } from '../screens/DailyReflectionScreen';
+import { RoomScreen } from '../screens/RoomScreen';
 import { CommunityScreen } from '../screens/CommunityScreen';
 import { CommentsScreen } from '../screens/CommentsScreen';
 import { CreatePostScreen } from '../screens/CreatePostScreen';
@@ -17,12 +15,43 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { ExerciseLibraryScreen } from '../screens/ExerciseLibraryScreen';
+import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
+import { GuidedExerciseScreen } from '../screens/GuidedExerciseScreen';
+import { ExerciseCompleteScreen } from '../screens/ExerciseCompleteScreen';
+import { WeeklyPlanningScreen } from '../screens/WeeklyPlanningScreen';
+import { WeeklyPlanningCompleteScreen } from '../screens/WeeklyPlanningCompleteScreen';
+import { WeeklyReviewScreen } from '../screens/WeeklyReviewScreen';
+import { WeeklyReviewCompleteScreen } from '../screens/WeeklyReviewCompleteScreen';
 import { theme } from '../theme';
 
 const Tab = createBottomTabNavigator();
+const HomeStack = createStackNavigator();
 const CommunityStack = createStackNavigator();
-const MeditationStack = createStackNavigator();
 const AuthStack = createStackNavigator();
+
+function HomeStackNavigator() {
+  return (
+    <HomeStack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <HomeStack.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStack.Screen name="Room" component={RoomScreen} />
+      <HomeStack.Screen name="MeditationTimer" component={MeditationTimerScreen} />
+      <HomeStack.Screen name="Profile" component={ProfileScreen} />
+      <HomeStack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
+      <HomeStack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
+      <HomeStack.Screen name="GuidedExercise" component={GuidedExerciseScreen} />
+      <HomeStack.Screen name="ExerciseComplete" component={ExerciseCompleteScreen} />
+      <HomeStack.Screen name="WeeklyPlanning" component={WeeklyPlanningScreen} />
+      <HomeStack.Screen name="WeeklyPlanningComplete" component={WeeklyPlanningCompleteScreen} />
+      <HomeStack.Screen name="WeeklyReview" component={WeeklyReviewScreen} />
+      <HomeStack.Screen name="WeeklyReviewComplete" component={WeeklyReviewCompleteScreen} />
+    </HomeStack.Navigator>
+  );
+}
 
 function CommunityStackNavigator() {
   return (
@@ -36,21 +65,6 @@ function CommunityStackNavigator() {
       <CommunityStack.Screen name="CreatePost" component={CreatePostScreen} />
       <CommunityStack.Screen name="LetterDetail" component={LetterDetailScreen} />
     </CommunityStack.Navigator>
-  );
-}
-
-function MeditationStackNavigator() {
-  return (
-    <MeditationStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <MeditationStack.Screen name="MeditationLibrary" component={MeditationScreen} />
-      <MeditationStack.Screen name="MeditationTimer" component={MeditationTimerScreen} />
-      <MeditationStack.Screen name="CollectiveSession" component={CollectiveSessionScreen} />
-      <MeditationStack.Screen name="DailyReflection" component={DailyReflectionScreen} />
-    </MeditationStack.Navigator>
   );
 }
 
@@ -80,20 +94,6 @@ function MainTabs() {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⌂</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Meditate"
-        component={MeditationStackNavigator}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◠</Text>,
-        }}
-      />
-      <Tab.Screen
         name="Chat"
         component={ChatScreen}
         options={{
@@ -101,17 +101,17 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="Home"
+        component={HomeStackNavigator}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◈</Text>,
+        }}
+      />
+      <Tab.Screen
         name="Community"
         component={CommunityStackNavigator}
         options={{
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◉</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◍</Text>,
         }}
       />
     </Tab.Navigator>

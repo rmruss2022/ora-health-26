@@ -1,275 +1,389 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Image,
-  ImageBackground,
-  ActivityIndicator,
+  View,
+  Text,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
-  View,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../context/AuthContext';
-import { meditationApi, Meditation, MeditationStats } from '../services/meditation';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MeditationList, Meditation } from '../components/MeditationList';
+import { MeditationFilterModal, MeditationFilters } from '../components/MeditationFilterModal';
+import { roomsAPI, MeditationRoom } from '../services/api/roomsAPI';
 import { theme } from '../theme';
 
-const weekDays = [
-  { day: 'Mon', value: 0, isActive: true },
-  { day: 'Tue', value: 0, isActive: true },
-  { day: 'Wed', value: 0, isActive: true },
-  { day: 'Thu', value: 15, isActive: false },
-  { day: 'Fri', value: 16, isActive: false },
-  { day: 'Sat', value: 17, isActive: false },
-  { day: 'Sun', value: 18, isActive: false, isMuted: true },
+const MOCK_MEDITATIONS: Meditation[] = [
+  {
+    id: '1',
+    title: 'Box Breathing',
+    description: 'Calm your nervous system with 4-4-4-4 breathing',
+    duration: 5,
+    category: 'breathwork',
+    icon: '🫁',
+    mood: 'calm',
+    difficulty: 'beginner',
+  },
+  {
+    id: '2',
+    title: 'Loving Kindness',
+    description: 'Cultivate compassion for yourself and others',
+    duration: 10,
+    category: 'loving-kindness',
+    icon: '💚',
+    mood: 'restore',
+    difficulty: 'beginner',
+  },
+  {
+    id: '3',
+    title: 'Anxiety Relief',
+    description: 'Find peace in moments of worry',
+    duration: 7,
+    category: 'anxiety',
+    icon: '🌊',
+    mood: 'calm',
+    difficulty: 'beginner',
+  },
+  {
+    id: '4',
+    title: 'Body Scan',
+    description: 'Release tension through mindful awareness',
+    duration: 15,
+    category: 'body-scan',
+    icon: '✨',
+    mood: 'ground',
+    difficulty: 'intermediate',
+  },
+  {
+    id: '5',
+    title: 'Sleep Meditation',
+    description: 'Drift into peaceful rest',
+    duration: 20,
+    category: 'sleep',
+    icon: '🌙',
+    mood: 'restore',
+    difficulty: 'beginner',
+  },
 ];
 
-const HOME_CACHE_KEY = 'home-dashboard-cache-v1';
-const REQUEST_TIMEOUT_MS = 2500;
-
-const HERO_IMAGE_URI =
-  'https://images.pexels.com/photos/1054655/pexels-photo-1054655.jpeg?auto=compress&cs=tinysrgb&w=900&q=70';
-const FEATURED_IMAGE_URI =
-  'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=640&q=65';
-const QUICK_PLAN_IMAGE_URI =
-  'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=520&q=60';
-const QUICK_WORKSHOP_IMAGE_URI =
-  'https://images.unsplash.com/photo-1616628182509-6f27f72f0d69?auto=format&fit=crop&w=520&q=60';
-
-const FALLBACK_STATS: MeditationStats = {
-  totalSessions: 20,
-  totalMinutes: 0,
-  currentStreak: 7,
-  completedThisWeek: 7,
-};
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
-    }),
-  ]);
+interface Room {
+  id: string;
+  name: string;
+  description: string;
+  theme: string;
+  tags: string[];
+  currentParticipants: number;
+  gradientStart?: string;
+  gradientEnd?: string;
+  icon?: string;
+  image: any;
 }
 
-export const HomeScreen: React.FC = () => {
+interface HomeScreenProps {
+  navigation?: any;
+}
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
-  const { user } = useAuth();
-  const [featuredMeditation, setFeaturedMeditation] = useState<Meditation | null>(null);
-  const [stats, setStats] = useState<MeditationStats | null>(FALLBACK_STATS);
-  const [isLoadingHomeData, setIsLoadingHomeData] = useState(false);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filters, setFilters] = useState<MeditationFilters>({});
+
+  const ROOMS_DATA: Room[] = [
+    {
+      id: 'commons',
+      name: 'Garden Pavilion',
+      description: 'Meditate together in natures garden',
+      theme: 'garden',
+      tags: ['community', 'nature', 'welcoming'],
+      currentParticipants: 12,
+      image: require('../../assets/room-commons.png'),
+    },
+    {
+      id: 'tide-pool',
+      name: 'Tide Pool',
+      description: 'Find calm in the gentle rhythm of waves',
+      theme: 'tide-pool',
+      tags: ['mindfulness', 'grounding', 'calm'],
+      currentParticipants: 8,
+      image: require('../../assets/room-tidepool.png'),
+    },
+    {
+      id: 'starlit',
+      name: 'Starlit Clearing',
+      description: 'Meditate under the stars',
+      theme: 'starlit',
+      tags: ['evening', 'peace', 'reflection'],
+      currentParticipants: 5,
+      image: require('../../assets/room-starlit.png'),
+    },
+    {
+      id: 'forest',
+      name: 'Forest Nest',
+      description: 'Ground yourself in natures embrace',
+      theme: 'forest',
+      tags: ['nature', 'renewal', 'growth'],
+      currentParticipants: 15,
+      image: require('../../assets/room-forest.png'),
+    },
+  ];
+
+  const SOLO_ROOM: Room = {
+    id: 'solo',
+    name: 'Solo Sanctuary',
+    description: 'Your personal meditation space',
+    theme: 'solo',
+    tags: ['solo', 'focus', 'privacy'],
+    currentParticipants: 1,
+    image: require('../../assets/room-solo.png'),
+  };
+
+  const ROOM_THEME_IMAGES: Record<string, any> = {
+    commons: require('../../assets/room-commons.png'),
+    'tide-pool': require('../../assets/room-tidepool.png'),
+    starlit: require('../../assets/room-starlit.png'),
+    forest: require('../../assets/room-forest.png'),
+    solo: require('../../assets/room-solo.png'),
+    garden: require('../../assets/room-commons.png'),
+  };
 
   useEffect(() => {
-    let mounted = true;
+    loadRooms();
+  }, []);
 
-    const loadFromCache = async () => {
-      try {
-        const cachedRaw = await AsyncStorage.getItem(HOME_CACHE_KEY);
-        if (!cachedRaw || !mounted) return;
+  const mapRoomWithImage = (room: Omit<Room, 'image'>): Room => ({
+    ...room,
+    image: ROOM_THEME_IMAGES[room.theme] || ROOM_THEME_IMAGES.commons,
+  });
 
-        const cached = JSON.parse(cachedRaw) as {
-          featuredMeditation?: Meditation | null;
-          stats?: MeditationStats | null;
-        };
+  const mapApiRoom = (room: MeditationRoom): Room =>
+    mapRoomWithImage({
+      id: room.id,
+      name: room.name,
+      description: room.description,
+      theme: room.theme,
+      tags: room.tags,
+      currentParticipants: room.currentParticipants,
+      gradientStart: room.gradientStart,
+      gradientEnd: room.gradientEnd,
+      icon: room.icon,
+    });
 
-        if (cached.featuredMeditation) {
-          setFeaturedMeditation(cached.featuredMeditation);
-        }
-        if (cached.stats) {
-          setStats(cached.stats);
-        }
-      } catch (error) {
-        console.warn('Failed to parse home cache:', error);
+  const loadRooms = async () => {
+    try {
+      setLoading(true);
+      const apiRooms = await roomsAPI.getRooms();
+
+      if (apiRooms.length > 0) {
+        setRooms(apiRooms.map(mapApiRoom));
+      } else {
+        setRooms(ROOMS_DATA.map(mapRoomWithImage));
       }
-    };
+    } catch (error) {
+      console.error('Failed to load rooms:', error);
+      setRooms(ROOMS_DATA.map(mapRoomWithImage));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const loadHomeData = async () => {
-      setIsLoadingHomeData(true);
-      try {
-        const statsPromise = withTimeout(meditationApi.getUserStats(user?.id), REQUEST_TIMEOUT_MS);
-        const featuredPromise = withTimeout(
-          meditationApi.getMeditationsByCategory('breathwork'),
-          REQUEST_TIMEOUT_MS
-        ).catch(async () => {
-          return withTimeout(meditationApi.getAllMeditations(), REQUEST_TIMEOUT_MS);
-        });
+  const getRecommendedRoom = (): Room => {
+    if (rooms.length === 0) {
+      return mapRoomWithImage(ROOMS_DATA[0]);
+    }
 
-        const [meditationsResult, statsResult] = await Promise.allSettled([featuredPromise, statsPromise]);
+    const hour = new Date().getHours();
+    const preferredTheme =
+      hour >= 6 && hour < 12
+        ? 'commons'
+        : hour >= 12 && hour < 17
+          ? 'tide-pool'
+          : hour >= 17 && hour < 21
+            ? 'forest'
+            : 'starlit';
 
-        if (!mounted) return;
+    const preferredRoom = rooms.find((room) => room.theme === preferredTheme);
+    return preferredRoom || rooms[0];
+  };
 
-        const allMeditations =
-          meditationsResult.status === 'fulfilled' ? meditationsResult.value : [];
-        const meditationStats = statsResult.status === 'fulfilled' ? statsResult.value : FALLBACK_STATS;
+  const handleRoomPress = (room: Room) => {
+    navigation?.navigate('Room', { roomId: room.id, roomName: room.name });
+  };
 
-        const preferredMeditation =
-          allMeditations.find((entry) => entry.category === 'breathwork') ?? allMeditations[0] ?? null;
-        setFeaturedMeditation(preferredMeditation);
-        setStats(meditationStats);
+  const handleMeditationPress = (meditation: Meditation) => {
+    navigation?.navigate('MeditationTimer', { meditation });
+  };
 
-        await AsyncStorage.setItem(
-          HOME_CACHE_KEY,
-          JSON.stringify({
-            featuredMeditation: preferredMeditation,
-            stats: meditationStats,
-          })
-        );
-      } catch (error) {
-        console.error('Failed to load home data:', error);
-      } finally {
-        if (mounted) {
-          setIsLoadingHomeData(false);
-        }
-      }
-    };
+  const handleApplyFilters = (newFilters: MeditationFilters) => {
+    setFilters(newFilters);
+  };
 
-    loadFromCache().finally(loadHomeData);
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
-
-  const greetingName = useMemo(() => user?.name?.split(' ')[0] || 'Matt', [user?.name]);
-  const streakDays = stats?.currentStreak ?? 7;
-  const totalSessions = stats?.totalSessions ?? 20;
-  const completedThisWeek = stats?.completedThisWeek ?? 7;
-  const featuredDuration = featuredMeditation?.duration ?? 10;
+  const recommendedRoom = getRecommendedRoom();
+  const hasSoloRoom = rooms.some((room) => room.theme === 'solo');
+  const exploreRooms = [
+    ...rooms.filter((room) => room.id !== recommendedRoom.id),
+    ...(hasSoloRoom ? [] : [SOLO_ROOM]),
+  ];
 
   return (
     <View style={styles.container}>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 88 },
+        ]}
       >
-        <ImageBackground
-          source={{ uri: HERO_IMAGE_URI }}
-          style={[styles.hero, { paddingTop: insets.top + 8 }]}
-          imageStyle={styles.heroImage}
-        >
-          <View style={styles.timeRow}>
-            <Text style={styles.timeText}>09:41</Text>
-          </View>
-          <View style={styles.heroHeader}>
-            <Text style={styles.greeting}>Hi {greetingName}</Text>
-            <View style={styles.statPills}>
-              <View style={styles.pill}>
-                <Text style={styles.pillIcon}>⌂</Text>
-                <Text style={styles.pillValue}>{completedThisWeek}</Text>
+        <View style={styles.headerSection}>
+          <View style={styles.headerTopRow}>
+          <Text style={styles.greeting}>Hi Matthew</Text>
+
+            <View style={styles.badges}>
+              <View style={styles.badge}>
+                <Image
+                  source={require('../../assets/icon-flame.png')}
+                  style={styles.badgeIconImage}
+                  resizeMode="contain"
+                />
+                <Text style={styles.badgeText}>0</Text>
               </View>
-              <View style={styles.pill}>
-                <Text style={styles.pillIcon}>🏆</Text>
-                <Text style={styles.pillValue}>{totalSessions}</Text>
+              <View style={styles.badge}>
+                <Image
+                  source={require('../../assets/icon-trophy.png')}
+                  style={styles.badgeIconImage}
+                  resizeMode="contain"
+                />
+                <Text style={styles.badgeText}>0</Text>
               </View>
             </View>
           </View>
-        </ImageBackground>
+        </View>
 
         <View style={styles.affirmationCard}>
-          <View style={styles.weekBadge}>
-            <Text style={styles.weekBadgeText}>Week 5</Text>
+          <View style={styles.affirmationHeader}>
+            <LinearGradient
+              colors={['#D4B8E8', '#F8C8DC']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.compassionGradient}
+            />
+            <View style={styles.affirmationTitleContainer}>
+              <Text style={styles.affirmationDay}>Day 0/7</Text>
+              <Text style={styles.affirmationTitle}>Self Compassion</Text>
+            </View>
           </View>
-          <View style={styles.cardHeader}>
-            <View style={styles.coin}>
-              <Text style={styles.coinText}>ORA</Text>
-            </View>
-            <View>
-              <Text style={styles.cardTitle}>Self Compassion</Text>
-              <Text style={styles.cardSubTitle}>Day {Math.min(completedThisWeek, 7)}/7</Text>
-            </View>
-          </View>
-
-          <View style={styles.affirmationInner}>
-            <View style={styles.todayPill}>
-              <Text style={styles.todayPillText}>Today&apos;s Affirmation</Text>
-            </View>
-            <Text style={styles.affirmationTitle}>I am kind to myself</Text>
-            <Text style={styles.affirmationBody}>
+          <View style={styles.affirmationContent}>
+            <Text style={styles.affirmationText}>I am kind to myself</Text>
+            <Text style={styles.affirmationDescription}>
               I embrace my journey with compassion, knowing I am enough as I am.
             </Text>
           </View>
-          <Text style={styles.dots}>•◦◦</Text>
         </View>
 
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHero}>
-            <Image
-              source={{ uri: FEATURED_IMAGE_URI }}
-              style={styles.sectionHeroImage}
-            />
-          </View>
-          <View style={styles.sectionMeta}>
-            <Text style={styles.sectionTitle}>{featuredMeditation?.title || 'Meditation for today'}</Text>
-            <Text style={styles.sectionCaption}>
-              {featuredMeditation?.description || 'Take a moment to center yourself.'}
-            </Text>
-            <View style={styles.xpPill}>
-              <Text style={styles.xpPillText}>XP {featuredDuration * 10}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.quickGrid}>
+        <View style={styles.recommendedContainer}>
+          <Text style={styles.circleTitle}>Recommended for you</Text>
           <TouchableOpacity
-            style={styles.quickCard}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Chat', { conversationMode: 'planning' })}
+            style={styles.recommendedRoomCard}
+            onPress={() => handleRoomPress(recommendedRoom)}
+            activeOpacity={0.9}
           >
             <Image
-              source={{ uri: QUICK_PLAN_IMAGE_URI }}
-              style={styles.quickImage}
+              source={recommendedRoom.image}
+              style={styles.recommendedRoomImage}
+              resizeMode="contain"
             />
-            <View style={styles.quickFooter}>
-              <Text style={styles.quickLabel}>Plan your week</Text>
-              <Text style={styles.quickArrow}>›</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.quickCard}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Meditate')}
-          >
-            <Image
-              source={{ uri: QUICK_WORKSHOP_IMAGE_URI }}
-              style={styles.quickImage}
-            />
-            <View style={styles.quickFooter}>
-              <Text style={styles.quickLabel}>Workshops</Text>
-              <Text style={styles.quickArrow}>›</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.streakCard}>
-          <Text style={styles.streakTitle}>{streakDays} days streak</Text>
-          <Text style={styles.streakSubTitle}>Way to go {greetingName}</Text>
-          <View style={styles.streakMeta}>
-            <Text style={styles.streakDate}>Jan 25</Text>
-            <Text style={styles.history}>View history</Text>
-          </View>
-          <View style={styles.weekRow}>
-            {weekDays.map((entry) => (
-              <View key={entry.day} style={[styles.dayItem, entry.isMuted && styles.dayItemMuted]}>
-                <Text style={styles.dayLabel}>{entry.day}</Text>
-                <View style={[styles.dayBubble, entry.isActive ? styles.dayBubbleActive : styles.dayBubbleNeutral]}>
-                  <Text style={[styles.dayValue, entry.isActive && styles.dayValueActive]}>
-                    {entry.isActive ? '◉' : entry.value}
-                  </Text>
-                </View>
+            <View style={styles.recommendedRoomContent}>
+              <Text style={styles.recommendedRoomName}>{recommendedRoom.name}</Text>
+              <Text style={styles.recommendedRoomDesc}>{recommendedRoom.description}</Text>
+              <View style={styles.recommendedRoomStats}>
+                <Image
+                  source={require('../../assets/avatar-user.png')}
+                  style={styles.avatarIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.participantCount}>
+                  {recommendedRoom.currentParticipants} meditating now
+                </Text>
               </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.assortmentContainer}>
+          <Text style={styles.circleTitle}>Explore other spaces</Text>
+          <View style={styles.roomGrid}>
+            {exploreRooms.map((room) => (
+              <TouchableOpacity
+                key={room.id}
+                style={styles.roomGridItem}
+                onPress={() => handleRoomPress(room)}
+                activeOpacity={0.9}
+              >
+                <Image
+                  source={room.image}
+                  style={styles.roomIllustration}
+                  resizeMode="contain"
+                />
+                <View style={styles.roomInfo}>
+                  <Text style={styles.roomName}>{room.name}</Text>
+                  <View style={styles.roomParticipants}>
+                    <Image
+                      source={require('../../assets/avatar-user.png')}
+                      style={styles.smallAvatarIcon}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.smallParticipantCount}>{room.currentParticipants}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>
-        {isLoadingHomeData && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="small" color="#66734E" />
+
+        <LinearGradient
+          colors={['#2D6A4F', '#52B788']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.seriesGradientContainer}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Cleansing & Deep Breathing</Text>
+            <TouchableOpacity
+              style={styles.browseButton}
+              onPress={() => setFilterModalVisible(true)}
+            >
+              <Text style={styles.browseButtonText}>Browse Series</Text>
+            </TouchableOpacity>
           </View>
-        )}
+          <Text style={styles.seriesSubtitle}>5 modules · 45 min total</Text>
+        </LinearGradient>
+
+        <View style={styles.section}>
+          <MeditationList
+            meditations={MOCK_MEDITATIONS}
+            filters={filters}
+            onMeditationPress={handleMeditationPress}
+          />
+        </View>
       </ScrollView>
+
+      <MeditationFilterModal
+        visible={filterModalVisible}
+        currentFilters={filters}
+        onClose={() => setFilterModalVisible(false)}
+        onApply={handleApplyFilters}
+      />
     </View>
   );
 };
@@ -277,335 +391,254 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ECECEC',
+    backgroundColor: theme.colors.backgroundLight,
   },
-  scroll: {
-    flex: 1,
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
-    paddingBottom: 28,
+    paddingHorizontal: 20,
   },
-  hero: {
-    height: 370,
-    paddingHorizontal: 26,
-    justifyContent: 'space-between',
-    paddingBottom: 44,
+  headerSection: {
+    marginBottom: 20,
   },
-  heroImage: {
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-  },
-  timeRow: {
-    paddingTop: 4,
-  },
-  timeText: {
-    color: '#F7F7F4',
-    fontFamily: theme.typography.label.fontFamily,
-    fontSize: 21,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  heroHeader: {
+  headerTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.lavender,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    paddingLeft: 12,
   },
   greeting: {
-    color: '#FAFBF8',
-    fontFamily: theme.typography.h3.fontFamily,
-    fontSize: 38,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    fontSize: 32,
+    fontFamily: 'Allura-Regular',
+    color: theme.colors.charcoal,
+    letterSpacing: 0.3,
+    paddingLeft: 25,
+    marginTop: 4,
+    top: 4
   },
-  statPills: {
+  badges: {
     flexDirection: 'row',
-    gap: 10,
   },
-  pill: {
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
   },
-  pillIcon: {
-    fontSize: 14,
-    color: '#3F4A3F',
+  badgeIconImage: {
+    width: 30,
+    height: 30,
+    marginRight: 4,
   },
-  pillValue: {
-    fontFamily: theme.typography.button.fontFamily,
-    color: '#2E3C31',
+  badgeText: {
     fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.charcoal,
   },
   affirmationCard: {
-    marginHorizontal: 22,
-    marginTop: -52,
-    borderRadius: 24,
-    backgroundColor: '#F6F5F2',
-    borderWidth: 1,
-    borderColor: '#D5D1C6',
-    padding: 16,
-    shadowColor: '#2A2A2A',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    backgroundColor: 'transparent',
   },
-  weekBadge: {
-    position: 'absolute',
-    right: 16,
-    top: -12,
-    backgroundColor: '#C8BB6D',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    zIndex: 2,
-  },
-  weekBadgeText: {
-    fontFamily: theme.typography.labelSmall.fontFamily,
-    color: '#4F4A2A',
-    fontSize: 12,
-  },
-  cardHeader: {
+  affirmationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     marginBottom: 16,
   },
-  coin: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#C0BAA7',
-    borderWidth: 2,
-    borderColor: '#9C9688',
-    alignItems: 'center',
-    justifyContent: 'center',
+  compassionGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
   },
-  coinText: {
-    fontFamily: theme.typography.label.fontFamily,
-    fontSize: 12,
-    color: '#504D44',
+  affirmationTitleContainer: {
+    flex: 1,
   },
-  cardTitle: {
-    fontFamily: theme.typography.h4.fontFamily,
-    color: '#3A3934',
-    fontSize: 22,
-  },
-  cardSubTitle: {
-    fontFamily: theme.typography.label.fontFamily,
-    color: '#6F8168',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  affirmationInner: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#D5C78D',
-    backgroundColor: '#F8F6EF',
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-  },
-  todayPill: {
-    marginTop: -28,
-    marginBottom: 8,
-    borderRadius: 16,
-    backgroundColor: '#C5C98F',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  todayPillText: {
-    fontFamily: theme.typography.labelSmall.fontFamily,
-    fontSize: 12,
-    color: '#4A5034',
-  },
-  affirmationTitle: {
-    fontFamily: theme.typography.h3.fontFamily,
-    color: '#6A7347',
-    fontSize: 24,
-    textAlign: 'center',
+  affirmationDay: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.lavender,
     marginBottom: 4,
   },
-  affirmationBody: {
-    fontFamily: theme.typography.body.fontFamily,
+  affirmationTitle: {
+    fontSize: 22,
+    fontWeight: '300',
+    fontFamily: 'System',
+    letterSpacing: 0.5,
+    color: theme.colors.charcoal,
+  },
+  affirmationContent: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  affirmationText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme.colors.charcoal,
+    marginBottom: 8,
+  },
+  affirmationDescription: {
     fontSize: 14,
-    color: '#6A6A64',
-    textAlign: 'center',
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
-  dots: {
-    textAlign: 'center',
-    color: '#7D8B62',
-    marginTop: 10,
-    letterSpacing: 2,
+  recommendedContainer: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    backgroundColor: 'transparent',
   },
-  sectionCard: {
-    marginTop: 20,
-    marginHorizontal: 22,
-    borderRadius: 18,
+  circleTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.lavender,
+    marginBottom: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#D5D1C6',
-    backgroundColor: '#F7F5EE',
-    overflow: 'hidden',
-  },
-  sectionHero: {
-    height: 218,
-    backgroundColor: '#DBD2A8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionHeroImage: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.88,
-  },
-  sectionMeta: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    position: 'relative',
-  },
-  sectionTitle: {
-    fontFamily: theme.typography.h4.fontFamily,
-    fontSize: 18,
-    color: '#575545',
-  },
-  sectionCaption: {
-    fontFamily: theme.typography.bodySmall.fontFamily,
-    color: '#8A8778',
-    fontSize: 14,
-  },
-  xpPill: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    backgroundColor: '#D4C57D',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-  },
-  xpPillText: {
-    fontFamily: theme.typography.labelSmall.fontFamily,
-    color: '#5A522B',
-    fontSize: 11,
-  },
-  quickGrid: {
-    marginTop: 10,
-    marginHorizontal: 22,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  quickCard: {
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#D5D1C6',
-    backgroundColor: '#F4F2EB',
-    overflow: 'hidden',
-  },
-  quickImage: {
-    width: '100%',
-    height: 90,
-  },
-  quickFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    borderColor: 'rgba(163, 163, 163, 0.45)',
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingHorizontal: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
   },
-  quickLabel: {
-    fontFamily: theme.typography.body.fontFamily,
-    color: '#5B5952',
-    fontSize: 16,
-  },
-  quickArrow: {
-    color: '#7A7A66',
-    fontSize: 20,
-  },
-  streakCard: {
-    marginTop: 12,
-    marginHorizontal: 22,
-    borderRadius: 16,
+  recommendedRoomCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D7D3C8',
-    backgroundColor: '#F6F4EE',
-    padding: 14,
+    borderColor: 'rgba(212, 184, 232, 0.45)',
+    borderRadius: 20,
+    padding: 12,
   },
-  streakTitle: {
-    fontFamily: theme.typography.h4.fontFamily,
-    fontSize: 32,
-    color: '#555249',
+  recommendedRoomImage: {
+    width: 140,
+    height: 140,
+    marginRight: 16,
   },
-  streakSubTitle: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 15,
-    color: '#657C69',
+  recommendedRoomContent: {
+    flex: 1,
   },
-  streakMeta: {
-    marginTop: 8,
+  recommendedRoomName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.charcoal,
+    marginBottom: 8,
+  },
+  recommendedRoomDesc: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  recommendedRoomStats: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  streakDate: {
-    fontFamily: theme.typography.label.fontFamily,
-    color: '#C6C1B4',
-    fontSize: 16,
+  avatarIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 6,
   },
-  history: {
-    fontFamily: theme.typography.label.fontFamily,
-    color: '#6E7C74',
-    fontSize: 16,
+  participantCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
   },
-  weekRow: {
-    marginTop: 8,
+  assortmentContainer: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    backgroundColor: 'transparent',
+  },
+  roomGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
   },
-  dayItem: {
+  roomGridItem: {
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    padding: 8,
+  },
+  roomIllustration: {
+    width: '100%',
+    height: 140,
+    marginBottom: 8,
+  },
+  roomInfo: {
     alignItems: 'center',
-    width: 38,
   },
-  dayItemMuted: {
-    opacity: 0.7,
-  },
-  dayLabel: {
-    fontFamily: theme.typography.labelSmall.fontFamily,
-    color: '#8B8B82',
-    fontSize: 12,
+  roomName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: theme.colors.charcoal,
+    textAlign: 'center',
     marginBottom: 6,
   },
-  dayBubble: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  roomParticipants: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  dayBubbleActive: {
-    backgroundColor: '#6125B3',
+  smallAvatarIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 4,
   },
-  dayBubbleNeutral: {
-    backgroundColor: '#E6E4E5',
+  smallParticipantCount: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
   },
-  dayValue: {
-    fontFamily: theme.typography.label.fontFamily,
-    color: '#6A6A6A',
+  seriesGradientContainer: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.white,
+  },
+  seriesSubtitle: {
     fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 0,
   },
-  dayValueActive: {
-    color: '#F3ECFF',
-    fontSize: 12,
+  browseButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
-  loadingOverlay: {
-    marginTop: 10,
-    alignItems: 'center',
+  browseButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.white,
   },
 });
-
-export default HomeScreen;

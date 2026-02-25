@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# generated coverage artifacts
+coverage/
+
+# generated asset variants/backups
+assets/*-backup.png
+assets/*-with-bg.png

@@ -35,7 +35,10 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
         style={[
           styles.filterChip,
           isSelected('all') && styles.filterChipActive,
-          { borderColor: '#E5E7EB' },
+          {
+            borderColor: isSelected('all') ? 'rgba(212,184,232,0.6)' : 'rgba(163,163,163,0.45)',
+            backgroundColor: isSelected('all') ? 'rgba(212,184,232,0.12)' : 'transparent',
+          },
         ]}
         onPress={() => onSelectCategory('all')}
         activeOpacity={0.7}
@@ -46,7 +49,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
         <Ionicons
           name="apps-outline"
           size={16}
-          color={isSelected('all') ? '#1F2937' : '#6B7280'}
+          color={isSelected('all') ? '#1d473e' : '#6B7280'}
         />
         <Text
           style={[
@@ -67,11 +70,11 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             isSelected(category.id) && styles.filterChipActive,
             {
               borderColor: isSelected(category.id)
-                ? category.color
-                : '#E5E7EB',
+                ? 'rgba(212,184,232,0.6)'
+                : 'rgba(163,163,163,0.45)',
               backgroundColor: isSelected(category.id)
-                ? category.backgroundColor
-                : '#FFFFFF',
+                ? 'rgba(212,184,232,0.12)'
+                : 'transparent',
             },
           ]}
           onPress={() => onSelectCategory(category.id)}
@@ -107,8 +110,8 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 0,
+    paddingVertical: 4,
     gap: 8,
   },
   filterChip: {
@@ -117,13 +120,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1.5,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    backgroundColor: 'transparent',
     marginRight: 8,
     gap: 6,
   },
   filterChipActive: {
-    borderWidth: 2,
+    borderWidth: 1,
   },
   filterText: {
     fontSize: 14,

@@ -6,7 +6,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CommunityPost, PostCategory } from '../../types';
-import { theme } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { getAuthorDisplayName, getAuthorAvatar } from '../../utils/anonymousAvatars';
 
@@ -117,18 +116,13 @@ export const PostCard: React.FC<PostCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderRadius: 16,
     padding: 16,
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: 'rgba(163,163,163,0.35)',
   },
   questionText: {
     fontSize: 17,
@@ -136,6 +130,7 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     lineHeight: 24,
     marginBottom: 12,
+    fontFamily: 'System',
   },
   authorRow: {
     flexDirection: 'row',
@@ -158,6 +153,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#374151',
+    fontFamily: 'System',
   },
   dot: {
     fontSize: 14,
@@ -167,12 +163,15 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 14,
     color: '#9CA3AF',
+    fontFamily: 'System',
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   categoryBadge: {
+    borderWidth: 1,
+    borderColor: 'rgba(163,163,163,0.35)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -180,6 +179,7 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: 'System',
   },
   spacer: {
     flex: 1,
@@ -198,6 +198,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
+    fontFamily: 'System',
   },
   chevron: {
     marginLeft: 8,

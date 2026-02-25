@@ -1,475 +1,269 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   ScrollView,
+  TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Switch,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../theme';
-import { reflectionService } from '../services/reflection.service';
-
-interface DailyPrompt {
-  id: string;
-  question: string;
-  date: string;
-  category: string;
-}
-
-interface PublicReflection {
-  id: string;
-  response: string;
-  createdAt: string;
-}
 
 export const DailyReflectionScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
-  // State
-  const [prompt, setPrompt] = useState<DailyPrompt | null>(null);
-  const [response, setResponse] = useState('');
+  const [reflectionText, setReflectionText] = useState('');
   const [isPublic, setIsPublic] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [publicReflections, setPublicReflections] = useState<PublicReflection[]>([]);
-  const [showCommunity, setShowCommunity] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadPrompt();
-  }, []);
+  // Mock prompt
+  const todayPrompt = "What am I grateful for today?";
 
-  const loadPrompt = async () => {
-    try {
-      setLoading(true);
-      const todayPrompt = await reflectionService.getDailyPrompt();
-      setPrompt(todayPrompt);
+  // Mock community responses
+  const communityResponses = [
+    "The warmth of the morning sun",
+    "A conversation with an old friend",
+    "The quiet moments before the day begins",
+  ];
 
-      // Check if user already answered
-      const existingResponse = await reflectionService.getUserReflection(todayPrompt.id);
-      if (existingResponse) {
-        setResponse(existingResponse.response);
-        setIsPublic(existingResponse.isPublic);
-        setSaved(true);
-      }
-    } catch (error) {
-      console.error('Failed to load prompt:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = async () => {
+    if (!reflectionText.trim()) return;
+
+    setSubmitting(true);
+    
+    // Simulate submission
+    setTimeout(() => {
+      console.log('Reflection submitted:', {
+        text: reflectionText,
+        isPublic,
+      });
+      setSubmitting(false);
+      navigation.goBack();
+    }, 500);
   };
-
-  const handleSave = async () => {
-    if (!prompt || !response.trim()) return;
-
-    try {
-      setSaving(true);
-      await reflectionService.saveReflection(prompt.id, response, isPublic);
-      setSaved(true);
-
-      // Load community responses
-      if (isPublic) {
-        const community = await reflectionService.getPublicReflections(prompt.id, 3);
-        setPublicReflections(community);
-        setShowCommunity(true);
-      }
-    } catch (error) {
-      console.error('Failed to save reflection:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleViewCommunity = async () => {
-    if (!prompt) return;
-
-    try {
-      const community = await reflectionService.getPublicReflections(prompt.id, 5);
-      setPublicReflections(community);
-      setShowCommunity(true);
-    } catch (error) {
-      console.error('Failed to load community reflections:', error);
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.forestGreen} />
-      </View>
-    );
-  }
-
-  if (!prompt) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No reflection prompt available</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadPrompt}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
-      {/* Background gradient */}
-      <LinearGradient
-        colors={[theme.colors.cream, theme.colors.lavender + '15']}
-        style={StyleSheet.absoluteFillObject}
-      />
-
+    <View style={styles.container}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 88 },
+        ]}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.dateText}>
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </Text>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{prompt.category}</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Daily Reflection</Text>
+        </View>
+
+        {/* Prompt Card */}
+        <View style={styles.promptCard}>
+          <Text style={styles.promptLabel}>Today's Prompt</Text>
+          <Text style={styles.promptText}>{todayPrompt}</Text>
+        </View>
+
+        {/* Input */}
+        <View style={styles.inputCard}>
+          <TextInput
+            style={styles.input}
+            placeholder="Write your reflection..."
+            placeholderTextColor={theme.colors.textSecondary}
+            multiline
+            numberOfLines={6}
+            value={reflectionText}
+            onChangeText={setReflectionText}
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* Public Toggle */}
+        <View style={styles.toggleCard}>
+          <View style={styles.toggleTextContainer}>
+            <Text style={styles.toggleTitle}>Share Publicly</Text>
+            <Text style={styles.toggleSubtitle}>
+              Your reflection will be shared anonymously with the community
+            </Text>
           </View>
+          <Switch
+            value={isPublic}
+            onValueChange={setIsPublic}
+            trackColor={{
+              false: '#D1D5DB',
+              true: theme.colors.forestGreen,
+            }}
+            thumbColor="#FFFFFF"
+          />
         </View>
 
-        {/* Prompt question */}
-        <View style={styles.promptContainer}>
-          <Text style={styles.promptText}>{prompt.question}</Text>
-        </View>
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            (!reflectionText.trim() || submitting) && styles.submitButtonDisabled,
+          ]}
+          onPress={handleSubmit}
+          disabled={!reflectionText.trim() || submitting}
+        >
+          <Text style={styles.submitButtonText}>
+            {submitting ? 'Submitting...' : 'Submit Reflection'}
+          </Text>
+        </TouchableOpacity>
 
-        {showCommunity && publicReflections.length > 0 ? (
-          // Show community responses
-          <View style={styles.communityContainer}>
-            <Text style={styles.communityTitle}>Community reflections</Text>
+        {/* Community Responses */}
+        {isPublic && communityResponses.length > 0 && (
+          <View style={styles.communitySection}>
+            <Text style={styles.communityTitle}>Community Responses</Text>
+            <Text style={styles.communitySubtitle}>
+              What others have shared today
+            </Text>
 
-            {publicReflections.map((reflection) => (
-              <View key={reflection.id} style={styles.reflectionCard}>
-                <Text style={styles.reflectionText}>{reflection.response}</Text>
+            {communityResponses.map((response, index) => (
+              <View key={index} style={styles.responseCard}>
+                <Text style={styles.responseText}>{response}</Text>
+                <Text style={styles.responseTime}>Anonymous • 2h ago</Text>
               </View>
             ))}
-
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setShowCommunity(false)}
-            >
-              <Text style={styles.backText}>Back to yours</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          // Input form
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Your thoughts..."
-              placeholderTextColor={theme.colors.forestGreen + '60'}
-              value={response}
-              onChangeText={setResponse}
-              multiline
-              textAlignVertical="top"
-              maxLength={1000}
-              editable={!saved}
-            />
-
-            <View style={styles.charCount}>
-              <Text style={styles.charCountText}>
-                {response.length} / 1000
-              </Text>
-            </View>
-
-            {/* Public toggle */}
-            <View style={styles.publicToggle}>
-              <View>
-                <Text style={styles.toggleLabel}>Share with community</Text>
-                <Text style={styles.toggleHint}>
-                  Your name won't be shown
-                </Text>
-              </View>
-              <Switch
-                value={isPublic}
-                onValueChange={setIsPublic}
-                trackColor={{
-                  false: theme.colors.forestGreen + '30',
-                  true: theme.colors.lavender,
-                }}
-                thumbColor={theme.colors.cream}
-                disabled={saved}
-              />
-            </View>
-
-            {/* Save button */}
-            {!saved ? (
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  (!response.trim() || saving) && styles.saveButtonDisabled,
-                ]}
-                onPress={handleSave}
-                disabled={!response.trim() || saving}
-              >
-                <LinearGradient
-                  colors={[theme.colors.forestGreen, theme.colors.forestGreen + 'dd']}
-                  style={styles.saveButtonGradient}
-                >
-                  {saving ? (
-                    <ActivityIndicator color={theme.colors.cream} />
-                  ) : (
-                    <Text style={styles.saveButtonText}>
-                      {isPublic ? 'Save & Share' : 'Save Privately'}
-                    </Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.savedContainer}>
-                <Text style={styles.savedText}>✓ Reflection saved</Text>
-                <TouchableOpacity
-                  style={styles.viewCommunityButton}
-                  onPress={handleViewCommunity}
-                >
-                  <Text style={styles.viewCommunityText}>
-                    See what others shared
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
       </ScrollView>
-
-      {/* Close button */}
-      <TouchableOpacity
-        style={styles.closeButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.closeText}>Close</Text>
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.cream,
+    backgroundColor: theme.colors.backgroundLight,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.cream,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.cream,
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    marginBottom: 20,
-  },
-  retryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: theme.colors.forestGreen,
-    borderRadius: 12,
-  },
-  retryText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.cream,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 100,
+  content: {
+    paddingHorizontal: 20,
   },
   header: {
-    marginBottom: 32,
-  },
-  dateText: {
-    fontSize: 14,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    opacity: 0.7,
-    marginBottom: 8,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.lavender + '30',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.forestGreen,
-    textTransform: 'lowercase',
-  },
-  promptContainer: {
-    marginBottom: 32,
-  },
-  promptText: {
-    fontSize: 28,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.forestGreen,
-    lineHeight: 38,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  textInput: {
-    backgroundColor: theme.colors.cream,
-    borderWidth: 1,
-    borderColor: theme.colors.forestGreen + '20',
-    borderRadius: 16,
-    padding: 16,
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    minHeight: 200,
-    maxHeight: 300,
-  },
-  charCount: {
-    alignItems: 'flex-end',
-    marginTop: 8,
     marginBottom: 24,
-  },
-  charCountText: {
-    fontSize: 12,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    opacity: 0.5,
-  },
-  publicToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: theme.colors.lavender + '15',
-    borderRadius: 16,
-    marginBottom: 24,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.forestGreen,
-    marginBottom: 4,
-  },
-  toggleHint: {
-    fontSize: 13,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    opacity: 0.6,
-  },
-  saveButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    height: 56,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonGradient: {
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontSize: 18,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.cream,
-  },
-  savedContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  savedText: {
-    fontSize: 18,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.forestGreen,
-    marginBottom: 16,
-  },
-  viewCommunityButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  viewCommunityText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    opacity: 0.7,
-  },
-  communityContainer: {
-    marginBottom: 20,
-  },
-  communityTitle: {
-    fontSize: 18,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.forestGreen,
-    marginBottom: 20,
-  },
-  reflectionCard: {
-    backgroundColor: theme.colors.cream,
-    borderWidth: 1,
-    borderColor: theme.colors.forestGreen + '15',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  reflectionText: {
-    fontSize: 15,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    lineHeight: 22,
   },
   backButton: {
+    marginBottom: 12,
+  },
+  backButtonText: {
+    color: theme.colors.forestGreen,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: theme.colors.charcoal,
+  },
+  promptCard: {
+    backgroundColor: theme.colors.forestGreen,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  promptLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.white,
+    opacity: 0.8,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  promptText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme.colors.white,
+    lineHeight: 28,
+  },
+  inputCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    minHeight: 150,
+  },
+  input: {
+    fontSize: 16,
+    color: theme.colors.charcoal,
+    lineHeight: 24,
+    flex: 1,
+  },
+  toggleCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+  },
+  toggleTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  toggleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.charcoal,
+    marginBottom: 4,
+  },
+  toggleSubtitle: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  submitButton: {
+    backgroundColor: theme.colors.forestGreen,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.white,
+  },
+  communitySection: {
     marginTop: 8,
   },
-  backText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    opacity: 0.6,
+  communityTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.charcoal,
+    marginBottom: 4,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  communitySubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginBottom: 16,
   },
-  closeText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.forestGreen,
-    opacity: 0.6,
+  responseCard: {
+    backgroundColor: theme.colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  responseText: {
+    fontSize: 15,
+    color: theme.colors.charcoal,
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  responseTime: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
 });
