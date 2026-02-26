@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Modal,
-  Alert,
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -70,11 +68,9 @@ export const RoomScreen: React.FC = () => {
   const { roomId, roomName } = route.params as { roomId: string; roomName?: string };
 
   const [room, setRoom] = useState<RoomDetails | null>(null);
-  const [resolvedRoomId, setResolvedRoomId] = useState<string | null>(null);
+  const [resolvedRoomId, setResolvedRoomId] = useState<string>(roomId);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [hasJoined, setHasJoined] = useState(false);
-  const [showJoinConfirm, setShowJoinConfirm] = useState(false);
 
   const isUuid = (value: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -100,85 +96,50 @@ export const RoomScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    loadRoomDetails();
+    loadAndJoinRoom();
   }, [roomId, roomName]);
 
-  const loadRoomDetails = async () => {
+  // Navigating to a room = joining it. No separate confirmation step.
+  const loadAndJoinRoom = async () => {
     try {
       setLoading(true);
       setLoadError(null);
-      const resolvedRoomId = await resolveRoomId(roomId, roomName);
-      setResolvedRoomId(resolvedRoomId);
-      const data = await roomsAPI.getRoomDetails(resolvedRoomId);
-      setRoom(data);
 
-      // Check if current user is already in the room
-      const isInRoom = data.participants.some((p: Participant) => p.userId === user?.id);
-      setHasJoined(isInRoom);
+      const resolved = await resolveRoomId(roomId, roomName);
+      setResolvedRoomId(resolved);
+      const data = await roomsAPI.getRoomDetails(resolved);
+
+      const alreadyJoined = data.participants.some((p: Participant) => p.userId === user?.id);
+      if (!alreadyJoined && user?.id) {
+        const joinData = await roomsAPI.joinRoom(resolved, {
+          userId: user.id,
+          userName: user.name || 'Anonymous',
+        });
+        setRoom(joinData.room);
+      } else {
+        setRoom(data);
+      }
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error) {
-      console.error('Failed to load room details:', error);
-      setLoadError('Failed to load room details');
+      console.error('Failed to join room:', error);
+      setLoadError('Failed to load room');
     } finally {
       setLoading(false);
     }
   };
 
-  const showJoinConfirmation = () => {
-    setShowJoinConfirm(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
-
-  const handleJoinRoom = async () => {
+  const handleLeaveRoom = async () => {
     try {
-      if (!user?.id) {
-        Alert.alert('Sign in required', 'Please sign in to join this room.');
-        return;
+      if (user?.id) {
+        await roomsAPI.leaveRoom(resolvedRoomId, user.id);
       }
-
-      setShowJoinConfirm(false);
-      const targetRoomId = resolvedRoomId || roomId;
-      const data = await roomsAPI.joinRoom(targetRoomId, {
-        userId: user.id,
-        userName: user.name || 'Anonymous',
-      });
-
-      setHasJoined(true);
-      setRoom(data.room);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.error('Failed to join room:', error);
-      Alert.alert('Error', 'Failed to join the room. Please try again.');
+      console.error('Failed to leave room:', error);
+    } finally {
+      navigation.navigate('HomeMain' as never);
     }
-  };
-
-  const handleLeaveRoom = async () => {
-    Alert.alert(
-      'Leave Room?',
-      'Are you sure you want to leave this meditation room?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (!user?.id) {
-                Alert.alert('Sign in required', 'Please sign in to leave this room.');
-                return;
-              }
-
-              const targetRoomId = resolvedRoomId || roomId;
-              await roomsAPI.leaveRoom(targetRoomId, user.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              navigation.goBack();
-            } catch (error) {
-              console.error('Failed to leave room:', error);
-              Alert.alert('Error', 'Failed to leave the room.');
-            }
-          },
-        },
-      ]
-    );
   };
 
   const handleStartMeditation = () => {
@@ -219,13 +180,8 @@ export const RoomScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={hasJoined ? handleLeaveRoom : () => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>
-              {hasJoined ? '← Leave' : '← Back'}
-            </Text>
+          <TouchableOpacity style={styles.backButton} onPress={handleLeaveRoom}>
+            <Text style={styles.backButtonText}>← Leave</Text>
           </TouchableOpacity>
         </View>
 
@@ -319,52 +275,9 @@ export const RoomScreen: React.FC = () => {
             >
               <Text style={styles.meditateButtonText}>Start Meditation</Text>
             </TouchableOpacity>
-            {!hasJoined && (
-              <TouchableOpacity 
-                style={styles.joinButton}
-                onPress={showJoinConfirmation}
-              >
-                <Text style={styles.joinButtonText}>Join Room</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </ScrollView>
       </LinearGradient>
-
-      {/* Join Confirmation Modal */}
-      <Modal
-        visible={showJoinConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowJoinConfirm(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalIcon}>{room.icon}</Text>
-            <Text style={styles.modalTitle}>Join {room.name}?</Text>
-            <Text style={styles.modalMessage}>
-              You'll join {room.currentParticipants > 0 
-                ? `${room.currentParticipants} ${room.currentParticipants === 1 ? 'person' : 'people'}`
-                : 'this meditation room'} and can start meditating together.
-            </Text>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowJoinConfirm(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalConfirmButton}
-                onPress={handleJoinRoom}
-              >
-                <Text style={styles.modalConfirmText}>Join</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };

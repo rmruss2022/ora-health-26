@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTTS } from '../hooks/useTTS';
+import { useAuraSeenToday } from '../hooks/useAuraSeenToday';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 import { theme } from '../theme';
 
@@ -45,34 +47,66 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   context = 'home',
   onDismiss,
 }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [visible, setVisible] = useState(true);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const expandAnim = useRef(new Animated.Value(0)).current;
+  // Prevents double-triggering within a single focus session
+  const hasAutoStartedRef = useRef(false);
 
   const message = getContextualMessage(context);
   const { speak, stop, isSpeaking } = useTTS('aura');
+  const { seenToday, markSeen, loading } = useAuraSeenToday(context);
 
-  // Auto-speak on load.
-  // Tries immediately after mount (works if user navigated via a tab tap).
-  // Falls back to a one-time document interaction listener for cold page loads
-  // where the browser hasn't received a user gesture yet.
+  // On every screen focus: reset per-focus state and stop any leftover audio.
+  // This ensures returning to the screen (tab switch or back navigation) re-evaluates
+  // whether to auto-show, rather than staying stale from a previous visit.
+  useFocusEffect(
+    useCallback(() => {
+      hasAutoStartedRef.current = false;
+      setVisible(true);
+      setExpanded(false);
+      return () => {
+        // Stop speaking when the user leaves this screen
+        stop();
+      };
+    }, [stop])
+  );
+
+  // Auto-expand + auto-speak on first daily visit.
+  // Fires whenever loading resolves OR seenToday changes (which happens on each focus
+  // because useAuraSeenToday resets to null then resolves the AsyncStorage check).
   useEffect(() => {
-    let spoken = false;
-    let timer: ReturnType<typeof setTimeout>;
+    // Wait for AsyncStorage check to finish
+    if (loading) return;
+    // Already shown today — stay quiet and collapsed
+    if (seenToday) return;
+    // Prevent double-fire within one focus session
+    if (hasAutoStartedRef.current) return;
 
+    hasAutoStartedRef.current = true;
+    setExpanded(true);
+    markSeen(); // persist today's date immediately so rapid nav doesn't double-show
+
+    if (!VOICE_AGENT_ENABLED) return;
+
+    let spoken = false;
     const trySpeak = () => {
       if (spoken) return;
       spoken = true;
       speak(message);
-      document.removeEventListener('click', trySpeak);
-      document.removeEventListener('keydown', trySpeak);
+      if (Platform.OS === 'web') {
+        document.removeEventListener('click', trySpeak);
+        document.removeEventListener('keydown', trySpeak);
+      }
     };
 
-    // Attempt auto-play after assets settle
-    timer = setTimeout(trySpeak, 1200);
+    // Attempt auto-play after assets settle (~1.2s)
+    const timer = setTimeout(trySpeak, 1200);
 
-    // Safety net for web: speak on very next user interaction if auto-play was blocked
+    // Safety net: if autoplay was blocked (NotAllowedError), the ElevenLabsService
+    // will retry on the next user click. But we also hook here in case VOICE_AGENT_ENABLED
+    // changes or the service isn't ready yet.
     if (Platform.OS === 'web') {
       document.addEventListener('click', trySpeak, { once: true });
       document.addEventListener('keydown', trySpeak, { once: true });
@@ -85,7 +119,7 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
         document.removeEventListener('keydown', trySpeak);
       }
     };
-  }, []);
+  }, [loading, seenToday, speak, message, markSeen]);
 
   // Subtle pulse on the orb
   useEffect(() => {
@@ -107,7 +141,7 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
     return () => loop.stop();
   }, []);
 
-  // Expand/collapse bubble
+  // Expand/collapse bubble animation
   useEffect(() => {
     Animated.spring(expandAnim, {
       toValue: expanded ? 1 : 0,
@@ -135,7 +169,7 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
 
   return (
     <View style={styles.wrapper} pointerEvents="box-none">
-      {/* Expanded message bubble */}
+      {/* Backdrop closes bubble on tap outside */}
       {expanded && (
         <Pressable style={styles.backdrop} onPress={() => setExpanded(false)} />
       )}
