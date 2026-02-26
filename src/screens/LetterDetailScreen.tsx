@@ -7,42 +7,30 @@ import {
   Animated,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { LetterView } from '../components/letters/LetterView';
-import { Letter } from '../components/letters/LetterCard';
+import { InboxMessage } from '../types';
 
 interface LetterDetailScreenProps {
   navigation: any;
   route: {
     params: {
-      letter: Letter;
+      letter: InboxMessage;
     };
   };
 }
 
-/**
- * LetterDetailScreen - Full-screen letter reading experience
- * 
- * Features:
- * - Entrance animation (fade in + slide up)
- * - Full LetterView component for reading
- * - Back button to return to inbox
- * - Clean, distraction-free reading experience
- * 
- * Animation:
- * - Fades in and slides up smoothly after navigation
- * - Premium feel that complements envelope open animation
- */
 export const LetterDetailScreen: React.FC<LetterDetailScreenProps> = ({
   navigation,
   route,
 }) => {
   const { letter } = route.params;
+  const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    // Entrance animation when screen mounts
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -57,30 +45,25 @@ export const LetterDetailScreen: React.FC<LetterDetailScreenProps> = ({
     ]).start();
   }, []);
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      {/* Header with back button */}
-      <View style={styles.header}>
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={handleBack}
+          onPress={() => navigation.goBack()}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          accessibilityHint="Returns to the inbox"
         >
           <Text style={styles.backIcon}>←</Text>
           <Text style={styles.backText}>Inbox</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Animated letter content */}
+      {/* Animated content */}
       <Animated.View
         style={[
           styles.contentContainer,
@@ -90,12 +73,7 @@ export const LetterDetailScreen: React.FC<LetterDetailScreenProps> = ({
           },
         ]}
       >
-        <LetterView
-          letter={letter}
-          // Optional: add thread support later
-          // onThreadPress={() => navigation.navigate('LetterThread', { threadId: letter.threadId })}
-          // threadCount={letter.threadCount}
-        />
+        <LetterView letter={letter} />
       </Animated.View>
     </View>
   );
@@ -108,12 +86,10 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: theme.colors.white,
-    paddingTop: 60, // Account for status bar
     paddingBottom: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    ...theme.shadows.sm,
   },
   backButton: {
     flexDirection: 'row',

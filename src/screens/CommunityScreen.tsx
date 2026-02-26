@@ -241,7 +241,19 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.sectionContainer}>
-          <Text style={styles.circleTitle}>Letters</Text>
+          {/* Letters header: "Letters" pill + "Inbox" pill */}
+          <View style={styles.lettersSectionHeader}>
+            <Text style={styles.circleTitle}>Letters</Text>
+            <TouchableOpacity
+              style={styles.inboxPill}
+              onPress={() => navigation.navigate('LetterDetail', {
+                letter: letters.find(l => l.isRead) || letters[0],
+              })}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.inboxPillText}>Inbox</Text>
+            </TouchableOpacity>
+          </View>
           {(() => {
             const currentLetter = letters.find(l => !openedLetters.has(l.id));
             if (!currentLetter) {
@@ -281,7 +293,7 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
               <Text style={styles.promptIcon}>✨</Text>
             </View>
             <View style={styles.promptContent}>
-              <Text style={styles.promptLabel}>This Week's Prompt</Text>
+              <Text style={styles.promptLabel}>Write something</Text>
               <Text style={styles.promptText}>What small habit has made a big impact?</Text>
             </View>
             <Text style={styles.promptArrow}>→</Text>
@@ -416,6 +428,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 14,
     borderRadius: 20,
+  },
+  lettersSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inboxPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 232, 0.6)',
+    backgroundColor: 'rgba(212, 184, 232, 0.15)',
+  },
+  inboxPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.lavender,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   circleTitle: {
     fontSize: 13,
