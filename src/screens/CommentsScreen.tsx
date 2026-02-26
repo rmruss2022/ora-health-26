@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { communityAPI } from '../services/api/communityAPI';
 import { CommunityPost, Comment, PostCategory } from '../types';
 import { PostCard } from '../components/community/PostCard';
@@ -32,6 +33,7 @@ export const CommentsScreen: React.FC<CommentsScreenProps> = ({
   route,
   navigation,
 }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { post: initialPost, category } = route.params;
   const [post, setPost] = useState<CommunityPost>(initialPost);
@@ -101,7 +103,7 @@ export const CommentsScreen: React.FC<CommentsScreenProps> = ({
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -177,7 +179,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
     paddingBottom: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     backgroundColor: theme.colors.white,

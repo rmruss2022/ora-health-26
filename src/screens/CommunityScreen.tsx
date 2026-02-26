@@ -122,9 +122,14 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
   const [categories, setCategories] = useState<PostCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [postsPage, setPostsPage] = useState(0);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [openedLetters, setOpenedLetters] = useState<Set<string>>(
     new Set(letters.filter(l => l.isRead).map(l => l.id))
   );
+
+  const PAGE_SIZE = 10;
 
   const handleLetterPress = (message: InboxMessage) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -135,7 +140,8 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
   useEffect(() => {
     loadLetters();
     loadCategories();
-    loadPosts();
+    setPostsPage(0);
+    loadPosts(0);
   }, [selectedCategory]);
 
   const loadLetters = async () => {
@@ -158,33 +164,52 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
     }
   };
 
-  const loadPosts = async () => {
+  const loadPosts = async (page: number = 0) => {
     try {
-      setLoading(true);
+      if (page === 0) setLoading(true);
+      else setLoadingMore(true);
+
       const data = await communityAPI.getPosts({
-        limit: 20,
-        offset: 0,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
         category: selectedCategory || undefined,
       });
-      const sortedPosts = [...data].sort((a, b) => {
+      const sortedPage = [...data].sort((a, b) => {
         if ((b.comments || 0) !== (a.comments || 0)) {
           return (b.comments || 0) - (a.comments || 0);
         }
         return (b.likes || 0) - (a.likes || 0);
       });
+
       const fallbackForCategory = selectedCategory
         ? FALLBACK_POSTS.filter((post) => post.category === selectedCategory)
         : FALLBACK_POSTS;
-      setPosts(sortedPosts.length > 0 ? sortedPosts : fallbackForCategory);
+
+      if (page === 0) {
+        setPosts(sortedPage.length > 0 ? sortedPage : fallbackForCategory);
+      } else {
+        setPosts((prev) => [...prev, ...sortedPage]);
+      }
+      setHasMorePosts(sortedPage.length === PAGE_SIZE);
     } catch (error) {
       console.error('Error loading posts:', error);
-      const fallbackForCategory = selectedCategory
-        ? FALLBACK_POSTS.filter((post) => post.category === selectedCategory)
-        : FALLBACK_POSTS;
-      setPosts(fallbackForCategory);
+      if (page === 0) {
+        const fallbackForCategory = selectedCategory
+          ? FALLBACK_POSTS.filter((post) => post.category === selectedCategory)
+          : FALLBACK_POSTS;
+        setPosts(fallbackForCategory);
+      }
+      setHasMorePosts(false);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = postsPage + 1;
+    setPostsPage(nextPage);
+    loadPosts(nextPage);
   };
 
   const handleComment = (postId: string) => {
@@ -326,17 +351,45 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
               </TouchableOpacity>
             </View>
           ) : (
-            posts.map((post) => {
-              const category = categories.find(c => c.id === post.category);
-              return (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  category={category}
-                  onPress={() => handleComment(post.id)}
-                />
-              );
-            })
+            <>
+              {posts.map((post) => {
+                const category = categories.find(c => c.id === post.category);
+                return (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    category={category}
+                    onPress={() => handleComment(post.id)}
+                  />
+                );
+              })}
+
+              {/* Load more */}
+              {hasMorePosts && (
+                <TouchableOpacity
+                  style={styles.loadMoreButton}
+                  onPress={handleLoadMore}
+                  activeOpacity={0.75}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color={theme.colors.lavender} />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Load more</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* Write post CTA */}
+              <TouchableOpacity
+                style={styles.writePostCTA}
+                onPress={() => navigation.navigate('CreatePost')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.writePostIcon}>✏️</Text>
+                <Text style={styles.writePostText}>Write post</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </ScrollView>
@@ -572,5 +625,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  loadMoreButton: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(163,163,163,0.4)',
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  loadMoreText: {
+    fontFamily: 'System',
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.lavender,
+    letterSpacing: 0.2,
+  },
+  writePostCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1d473e',
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 8,
+  },
+  writePostIcon: {
+    fontSize: 16,
+  },
+  writePostText: {
+    fontFamily: 'System',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });
