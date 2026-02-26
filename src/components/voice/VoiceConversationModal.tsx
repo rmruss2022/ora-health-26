@@ -166,10 +166,8 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onExit}>
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        {/* Background tap to exit */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onExit} />
-
-        <View style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
+        {/* Container blocks accidental background touches; exit via × only */}
+        <Pressable style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
 
           {/* Header */}
           <View style={styles.header}>
@@ -238,7 +236,7 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
             ) : null}
           </View>
 
-        </View>
+        </Pressable>
       </Animated.View>
     </Modal>
   );
