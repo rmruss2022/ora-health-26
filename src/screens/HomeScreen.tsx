@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MeditationList, Meditation } from '../components/MeditationList';
 import { MeditationFilterModal, MeditationFilters } from '../components/MeditationFilterModal';
 import { RoomPreviewSheet } from '../components/RoomPreviewSheet';
+import { FloatingAuraAgent } from '../components/FloatingAuraAgent';
 import { roomsAPI, MeditationRoom } from '../services/api/roomsAPI';
 import { theme } from '../theme';
 
@@ -384,6 +385,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
         </View>
       </ScrollView>
+
+      <FloatingAuraAgent context="home" />
 
       <RoomPreviewSheet
         room={previewRoom}

@@ -24,6 +24,7 @@ import { inboxAPI } from '../services/api/inboxAPI';
 import { CommunityPost, PostCategory, InboxMessage } from '../types';
 import { PostCard } from '../components/community/PostCard';
 import { CategoryFilter } from '../components/community/CategoryFilter';
+import { FloatingAuraAgent } from '../components/FloatingAuraAgent';
 
 interface CommunityScreenProps {
   navigation: any;
@@ -393,6 +394,8 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
           )}
         </View>
       </ScrollView>
+
+      <FloatingAuraAgent context="community" />
     </View>
   );
 };
