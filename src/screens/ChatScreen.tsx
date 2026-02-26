@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
+import { useTTS } from '../hooks/useTTS';
+import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 import { theme } from '../theme';
 
 type PersonaId = 'persona-ora' | 'persona-genz' | 'persona-psychotherapist';
@@ -74,6 +76,31 @@ export const ChatScreen: React.FC = () => {
   const selectedModeLabel = MODES.find((mode) => mode.id === selectedMode)?.label || 'Free Flow';
 
   const { messages, isLoading, sendMessage } = useChat(selectedBehaviorId, selectedPersona);
+
+  const { speak, stop, isSpeaking } = useTTS(selectedPersona);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  // Clear speaking state when playback finishes
+  useEffect(() => {
+    if (!isSpeaking) setSpeakingMessageId(null);
+  }, [isSpeaking]);
+
+  // Reset speaking when persona changes
+  useEffect(() => {
+    stop();
+  }, [selectedPersona]);
+
+  const handleSpeak = useCallback(
+    (id: string, content: string) => {
+      if (speakingMessageId === id && isSpeaking) {
+        stop();
+      } else {
+        setSpeakingMessageId(id);
+        speak(content);
+      }
+    },
+    [speak, stop, isSpeaking, speakingMessageId]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -184,7 +211,17 @@ export const ChatScreen: React.FC = () => {
           <FlatList
             data={messages}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <ChatMessage message={item} />}
+            renderItem={({ item }) => (
+              <ChatMessage
+                message={item}
+                onSpeak={
+                  VOICE_AGENT_ENABLED && item.role === 'assistant'
+                    ? () => handleSpeak(item.id, item.content)
+                    : undefined
+                }
+                isSpeaking={speakingMessageId === item.id && isSpeaking}
+              />
+            )}
             contentContainerStyle={styles.messagesList}
             showsVerticalScrollIndicator={false}
           />

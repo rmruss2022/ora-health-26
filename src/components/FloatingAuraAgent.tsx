@@ -8,6 +8,8 @@ import {
   Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTTS } from '../hooks/useTTS';
+import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 import { theme } from '../theme';
 
 type AuraContext = 'home' | 'community';
@@ -48,6 +50,7 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   const expandAnim = useRef(new Animated.Value(0)).current;
 
   const message = getContextualMessage(context);
+  const { speak, stop, isSpeaking } = useTTS('aura');
 
   // Subtle pulse on the orb
   useEffect(() => {
@@ -80,8 +83,17 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   }, [expanded]);
 
   const handleDismiss = () => {
+    stop();
     setVisible(false);
     onDismiss?.();
+  };
+
+  const handleListen = () => {
+    if (isSpeaking) {
+      stop();
+    } else {
+      speak(message);
+    }
   };
 
   if (!visible) return null;
@@ -125,6 +137,20 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
           >
             <Text style={styles.dismissIcon}>×</Text>
           </TouchableOpacity>
+          {VOICE_AGENT_ENABLED && (
+            <TouchableOpacity
+              style={[styles.listenButton, isSpeaking && styles.listenButtonActive]}
+              onPress={handleListen}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.listenIcon, isSpeaking && styles.listenIconActive]}>
+                {isSpeaking ? '■' : '▷'}
+              </Text>
+              <Text style={[styles.listenLabel, isSpeaking && styles.listenLabelActive]}>
+                {isSpeaking ? 'Stop' : 'Listen'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
         {/* Tail */}
         <View style={styles.tail} />
@@ -200,6 +226,38 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontWeight: '300',
     lineHeight: 20,
+  },
+  listenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(212,184,232,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,184,232,0.4)',
+    gap: 5,
+  },
+  listenButtonActive: {
+    backgroundColor: 'rgba(212,184,232,0.38)',
+    borderColor: 'rgba(155,138,180,0.6)',
+  },
+  listenIcon: {
+    fontSize: 8,
+    color: '#9B8AB4',
+  },
+  listenIconActive: {
+    color: '#7B5EA7',
+  },
+  listenLabel: {
+    fontSize: 11,
+    color: '#9B8AB4',
+    fontWeight: '500',
+  },
+  listenLabelActive: {
+    color: '#7B5EA7',
   },
   tail: {
     width: 12,
