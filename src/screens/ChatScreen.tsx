@@ -18,7 +18,9 @@ import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
 import { useTTS } from '../hooks/useTTS';
 import { usePTT } from '../hooks/usePTT';
+import { useVoiceConversation } from '../hooks/useVoiceConversation';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
+import { VoiceConversationModal } from '../components/voice/VoiceConversationModal';
 import { theme } from '../theme';
 
 type PersonaId = 'persona-ora' | 'persona-genz' | 'persona-psychotherapist';
@@ -125,12 +127,31 @@ export const ChatScreen: React.FC = () => {
     },
   });
 
+  const {
+    voiceState,
+    active: voiceConvActive,
+    enterVoiceMode,
+    exitVoiceMode,
+    handleOrbPress,
+  } = useVoiceConversation({ sendMessage, messages, personaId: selectedPersona, isLoading });
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {/* Voice Conversation Modal */}
+      {VOICE_AGENT_ENABLED && (
+        <VoiceConversationModal
+          visible={voiceConvActive}
+          voiceState={voiceState}
+          messages={messages}
+          onOrbPress={handleOrbPress}
+          onExit={exitVoiceMode}
+        />
+      )}
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.headerRow}>
@@ -144,6 +165,23 @@ export const ChatScreen: React.FC = () => {
             <Text style={styles.headerTitle}>Ora Club</Text>
             <Text style={styles.headerSubtitle}>A space for honest conversation</Text>
           </View>
+          {VOICE_AGENT_ENABLED && (
+            <TouchableOpacity
+              style={styles.voiceModeButton}
+              onPress={enterVoiceMode}
+              activeOpacity={0.75}
+              accessibilityLabel="Enter voice conversation mode"
+            >
+              <LinearGradient
+                colors={['#D4B8E8', '#F8C8DC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.voiceModeGradient}
+              >
+                <Text style={styles.voiceModeIcon}>⏺</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -279,6 +317,20 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  voiceModeButton: {
+    marginLeft: 8,
+  },
+  voiceModeGradient: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceModeIcon: {
+    fontSize: 14,
+    color: '#3d2060',
   },
   headerOrb: {
     width: 52,
