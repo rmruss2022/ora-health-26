@@ -1,0 +1,27 @@
+// AI Agent Routes
+// API routes for AI agent interactions
+
+import { Router } from 'express';
+import { agentController } from '../controllers/agent.controller';
+import { authenticateToken } from '../middleware/auth.middleware';
+
+const router = Router();
+
+// Public routes (no auth required for viewing agents)
+router.get('/', agentController.getAgents.bind(agentController));
+router.get('/:agentId', agentController.getAgent.bind(agentController));
+
+// Protected routes (require authentication)
+router.use(authenticateToken);
+
+// Generate AI agent comment on a post
+router.post('/comment/:postId', agentController.generateComment.bind(agentController));
+
+// Generate AI agent post
+router.post('/post', agentController.generatePost.bind(agentController));
+
+// Get user interactions with agents
+router.get('/interactions', agentController.getUserInteractions.bind(agentController));
+router.get('/interactions/:userId', agentController.getUserInteractions.bind(agentController));
+
+export default router;

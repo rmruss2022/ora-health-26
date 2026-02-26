@@ -1,0 +1,114 @@
+/**
+ * Weekly Review API Routes
+ */
+
+import { Router } from 'express';
+import { authenticateToken, AuthRequest } from '../middleware/auth.middleware';
+import { weeklyReviewService } from '../services/weekly-review.service';
+
+const router = Router();
+
+/**
+ * POST /api/weekly-review
+ * Save user's weekly review
+ */
+router.post('/', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { reflection, learnings, wins, challenges, moodScore } = req.body;
+
+    if (!reflection || reflection.trim().length === 0) {
+      return res.status(400).json({ error: 'Reflection is required' });
+    }
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Validate mood score if provided
+    if (moodScore !== undefined && (moodScore < 1 || moodScore > 10)) {
+      return res.status(400).json({ error: 'Mood score must be between 1 and 10' });
+    }
+
+    const review = await weeklyReviewService.saveWeeklyReview(
+      req.userId,
+      reflection.trim(),
+      {
+        learnings: learnings?.trim(),
+        wins: wins?.trim(),
+        challenges: challenges?.trim(),
+        moodScore,
+      }
+    );
+
+    res.json({
+      success: true,
+      review,
+    });
+  } catch (error: any) {
+    console.error('Error saving weekly review:', error);
+    res.status(500).json({ error: error.message || 'Failed to save weekly review' });
+  }
+});
+
+/**
+ * GET /api/weekly-review
+ * Get user's weekly reviews
+ */
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const limit = parseInt(req.query.limit as string) || 10;
+    const reviews = await weeklyReviewService.getUserWeeklyReviews(req.userId, limit);
+
+    res.json({ reviews });
+  } catch (error: any) {
+    console.error('Error fetching weekly reviews:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch weekly reviews' });
+  }
+});
+
+/**
+ * GET /api/weekly-review/current
+ * Get current week's review
+ */
+router.get('/current', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const review = await weeklyReviewService.getCurrentWeekReview(req.userId);
+
+    res.json({ review });
+  } catch (error: any) {
+    console.error('Error fetching current week review:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch current week review' });
+  }
+});
+
+/**
+ * POST /api/weekly-review/send-prompt
+ * Manually trigger review prompt for current user (testing)
+ */
+router.post('/send-prompt', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const sent = await weeklyReviewService.sendReviewPrompt(req.userId);
+
+    res.json({
+      success: sent,
+      message: sent ? 'Review prompt sent' : 'Failed to send review prompt',
+    });
+  } catch (error: any) {
+    console.error('Error sending review prompt:', error);
+    res.status(500).json({ error: error.message || 'Failed to send review prompt' });
+  }
+});
+
+export default router;
