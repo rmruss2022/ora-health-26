@@ -50,8 +50,9 @@ class ElevenLabsService {
         },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_monolingual_v1',
-          // Higher stability = more consistent, calmer delivery
+          model_id: 'eleven_turbo_v2_5',
+          // speed: 0.7–1.2 (default 1.0). 1.15 = slightly brisker, less corporate
+          speed: 1.15,
           voice_settings: { stability: 0.65, similarity_boost: 0.75 },
         }),
       });

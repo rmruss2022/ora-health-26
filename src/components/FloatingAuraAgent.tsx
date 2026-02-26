@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Pressable,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTTS } from '../hooks/useTTS';
@@ -51,6 +52,40 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
 
   const message = getContextualMessage(context);
   const { speak, stop, isSpeaking } = useTTS('aura');
+
+  // Auto-speak on load.
+  // Tries immediately after mount (works if user navigated via a tab tap).
+  // Falls back to a one-time document interaction listener for cold page loads
+  // where the browser hasn't received a user gesture yet.
+  useEffect(() => {
+    let spoken = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const trySpeak = () => {
+      if (spoken) return;
+      spoken = true;
+      speak(message);
+      document.removeEventListener('click', trySpeak);
+      document.removeEventListener('keydown', trySpeak);
+    };
+
+    // Attempt auto-play after assets settle
+    timer = setTimeout(trySpeak, 1200);
+
+    // Safety net for web: speak on very next user interaction if auto-play was blocked
+    if (Platform.OS === 'web') {
+      document.addEventListener('click', trySpeak, { once: true });
+      document.addEventListener('keydown', trySpeak, { once: true });
+    }
+
+    return () => {
+      clearTimeout(timer);
+      if (Platform.OS === 'web') {
+        document.removeEventListener('click', trySpeak);
+        document.removeEventListener('keydown', trySpeak);
+      }
+    };
+  }, []);
 
   // Subtle pulse on the orb
   useEffect(() => {
