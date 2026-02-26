@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$ROOT_DIR/ora-ai-api"
+DESKTOP_BACKEND_ENV="/Users/matthew/Desktop/Feb26/ora-ai-api/.env"
+RUN_DIR="$ROOT_DIR/.run"
+
+mkdir -p "$RUN_DIR"
+
+BACKEND_PID_FILE="$RUN_DIR/backend.pid"
+FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
+BACKEND_LOG="$RUN_DIR/backend.log"
+FRONTEND_LOG="$RUN_DIR/frontend.log"
+
+is_running_pid() {
+  local pid="${1:-}"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+load_env_if_present() {
+  local env_file="$1"
+  if [[ -f "$env_file" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$env_file"
+    set +a
+  fi
+}
+
+start_backend() {
+  if [[ -f "$BACKEND_PID_FILE" ]] && is_running_pid "$(cat "$BACKEND_PID_FILE")"; then
+    echo "Backend already running (pid $(cat "$BACKEND_PID_FILE"))."
+    return
+  fi
+
+  (
+    cd "$BACKEND_DIR"
+    load_env_if_present "$BACKEND_DIR/.env"
+    if [[ ! -f "$BACKEND_DIR/.env" ]]; then
+      load_env_if_present "$DESKTOP_BACKEND_ENV"
+    fi
+    export PORT="${PORT:-4000}"
+    export AI_PROVIDER="${AI_PROVIDER:-anthropic}"
+    exec npm run dev
+  ) >"$BACKEND_LOG" 2>&1 &
+
+  echo $! >"$BACKEND_PID_FILE"
+  echo "Started backend on :${PORT:-4000} (pid $(cat "$BACKEND_PID_FILE"))."
+}
+
+start_frontend() {
+  if [[ -f "$FRONTEND_PID_FILE" ]] && is_running_pid "$(cat "$FRONTEND_PID_FILE")"; then
+    echo "Frontend already running (pid $(cat "$FRONTEND_PID_FILE"))."
+    return
+  fi
+
+  (
+    cd "$ROOT_DIR"
+    export CI=false
+    exec npm start -- -c
+  ) >"$FRONTEND_LOG" 2>&1 &
+
+  echo $! >"$FRONTEND_PID_FILE"
+  echo "Started frontend on :8081 (pid $(cat "$FRONTEND_PID_FILE"))."
+}
+
+start_backend
+start_frontend
+
+echo
+echo "Logs:"
+echo "  Backend:  $BACKEND_LOG"
+echo "  Frontend: $FRONTEND_LOG"
+echo
+echo "URLs:"
+echo "  API:  http://localhost:${PORT:-4000}"
+echo "  App:  http://localhost:8081"

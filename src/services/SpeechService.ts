@@ -1,4 +1,5 @@
 import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
 const ELEVENLABS_STT_URL = 'https://api.elevenlabs.io/v1/speech-to-text';
 
@@ -59,8 +60,20 @@ class SpeechService {
   /** Send audio file to ElevenLabs STT and return transcript text. */
   async transcribe(uri: string, apiKey: string): Promise<string> {
     const formData = new FormData();
-    // React Native FormData accepts { uri, type, name } for file fields
-    formData.append('file', { uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
+
+    if (Platform.OS === 'web') {
+      // On web, uri is a blob URL — fetch it to get the actual Blob, then
+      // wrap it in a File so the browser's FormData sends it correctly.
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      const mimeType = blob.type || 'audio/webm';
+      const ext = mimeType.includes('webm') ? 'webm' : mimeType.includes('ogg') ? 'ogg' : 'mp4';
+      formData.append('file', new File([blob], `recording.${ext}`, { type: mimeType }));
+    } else {
+      // React Native FormData accepts { uri, type, name } for file fields
+      formData.append('file', { uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
+    }
+
     formData.append('model_id', 'scribe_v1');
 
     const response = await fetch(ELEVENLABS_STT_URL, {
@@ -70,7 +83,8 @@ class SpeechService {
     });
 
     if (!response.ok) {
-      throw new Error(`ElevenLabs STT error: ${response.status}`);
+      const errText = await response.text().catch(() => '');
+      throw new Error(`ElevenLabs STT error: ${response.status} ${errText}`);
     }
 
     const data = await response.json();

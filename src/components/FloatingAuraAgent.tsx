@@ -7,6 +7,7 @@ import {
   Animated,
   Pressable,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -61,15 +62,27 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   // Timer/listener refs — cleared on blur, NOT via useEffect cleanup
   const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTrySpeakRef = useRef<(() => void) | null>(null);
+  // Set true when trySpeak fires but AI message is still loading
+  const pendingSpeakRef = useRef(false);
 
   const fallbackMessage = getContextualMessage(context);
-  const { speak, stop, isSpeaking } = useTTS('aura');
-  const { message: dynamicMessage } = useAgentContext(context);
+  const { speak, stop, isSpeaking, isBlocked } = useTTS('aura');
+  const { message: dynamicMessage, loading: messageLoading } = useAgentContext(context);
 
   // Always use the most current message when TTS fires
   const message = dynamicMessage || fallbackMessage;
   const messageRef = useRef(message);
+  const messageLoadingRef = useRef(messageLoading);
   useEffect(() => { messageRef.current = message; }, [message]);
+  useEffect(() => { messageLoadingRef.current = messageLoading; }, [messageLoading]);
+
+  // When loading finishes and we deferred speaking, fire now
+  useEffect(() => {
+    if (pendingSpeakRef.current && !messageLoading) {
+      pendingSpeakRef.current = false;
+      speak(messageRef.current);
+    }
+  }, [messageLoading, speak]);
 
   // Animate bubble in/out
   useEffect(() => {
@@ -145,11 +158,16 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
         const trySpeak = () => {
           speakTimerRef.current = null;
           pendingTrySpeakRef.current = null;
-          // Use messageRef to get the latest message (AI may have loaded by now)
-          speak(messageRef.current);
           if (Platform.OS === 'web') {
             document.removeEventListener('click', trySpeak);
             document.removeEventListener('keydown', trySpeak);
+          }
+          if (messageLoadingRef.current) {
+            // AI message still fetching — defer until it arrives
+            pendingSpeakRef.current = true;
+          } else {
+            // Use messageRef to get the latest message (AI may have loaded by now)
+            speak(messageRef.current);
           }
         };
 
@@ -165,6 +183,7 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
       return () => {
         clearTimeout(expandTimer);
         stop();
+        pendingSpeakRef.current = false;
         if (speakTimerRef.current !== null) {
           clearTimeout(speakTimerRef.current);
           speakTimerRef.current = null;
@@ -198,6 +217,8 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   };
 
   const handleListen = () => {
+    // When blocked, any click anywhere will unlock — don't stop() here
+    if (isBlocked) return;
     if (isSpeaking) {
       stop();
     } else {
@@ -233,7 +254,15 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
         pointerEvents={expanded ? 'auto' : 'none'}
       >
         <View style={styles.bubble}>
-          <Text style={styles.bubbleText}>{message}</Text>
+          {messageLoading ? (
+            <ActivityIndicator
+              size="small"
+              color="#C4A8D8"
+              style={styles.spinner}
+            />
+          ) : (
+            <Text style={styles.bubbleText}>{message}</Text>
+          )}
           <TouchableOpacity
             style={styles.dismissBubble}
             onPress={handleDismiss}
@@ -241,17 +270,17 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
           >
             <Text style={styles.dismissIcon}>×</Text>
           </TouchableOpacity>
-          {VOICE_AGENT_ENABLED && (
+          {VOICE_AGENT_ENABLED && !messageLoading && (
             <TouchableOpacity
-              style={[styles.listenButton, isSpeaking && styles.listenButtonActive]}
+              style={[styles.listenButton, isSpeaking && !isBlocked && styles.listenButtonActive]}
               onPress={handleListen}
-              activeOpacity={0.7}
+              activeOpacity={isBlocked ? 1 : 0.7}
             >
-              <Text style={[styles.listenIcon, isSpeaking && styles.listenIconActive]}>
-                {isSpeaking ? '■' : '▷'}
+              <Text style={[styles.listenIcon, isSpeaking && !isBlocked && styles.listenIconActive]}>
+                {isBlocked ? '▷' : isSpeaking ? '■' : '▷'}
               </Text>
-              <Text style={[styles.listenLabel, isSpeaking && styles.listenLabelActive]}>
-                {isSpeaking ? 'Stop' : 'Listen'}
+              <Text style={[styles.listenLabel, isSpeaking && !isBlocked && styles.listenLabelActive]}>
+                {isBlocked ? 'Tap anywhere to hear' : isSpeaking ? 'Stop' : 'Listen'}
               </Text>
             </TouchableOpacity>
           )}
@@ -304,6 +333,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.white,
     borderRadius: 16,
     padding: 14,
+    minHeight: 52,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -311,6 +341,10 @@ const styles = StyleSheet.create({
     elevation: 6,
     borderWidth: 1,
     borderColor: 'rgba(212,184,232,0.4)',
+  },
+  spinner: {
+    marginVertical: 4,
+    marginRight: 24,
   },
   bubbleText: {
     fontSize: 13,

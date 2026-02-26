@@ -106,25 +106,25 @@ export class AgentMemoryService {
     try {
       const result = await query(
         `WITH recent AS (
-          SELECT created_at::date as date, duration_seconds as duration
+          SELECT created_at::date as date, COALESCE(duration_completed, 0) as duration
           FROM meditation_sessions
           WHERE user_id = $1
           AND created_at > NOW() - INTERVAL '90 days'
           ORDER BY created_at DESC
           LIMIT 10
         )
-        SELECT 
+        SELECT
           (SELECT COUNT(*) FROM meditation_sessions WHERE user_id = $1 AND created_at > NOW() - INTERVAL '90 days') as total_sessions,
-          (SELECT COALESCE(SUM(duration_seconds), 0) FROM meditation_sessions WHERE user_id = $1 AND created_at > NOW() - INTERVAL '90 days') as total_seconds,
+          (SELECT COALESCE(SUM(duration_completed), 0) FROM meditation_sessions WHERE user_id = $1 AND created_at > NOW() - INTERVAL '90 days') as total_minutes,
           (SELECT json_agg(json_build_object('date', date, 'duration', duration)) FROM recent) as recent_sessions`,
-        [userId, userId, userId]
+        [userId]
       );
 
       const row = result.rows[0];
 
       return {
         totalSessions: parseInt(row?.total_sessions || '0'),
-        totalMinutes: Math.round((parseInt(row?.total_seconds || '0')) / 60),
+        totalMinutes: parseInt(row?.total_minutes || '0'),
         recentSessions: row?.recent_sessions || [],
       };
     } catch (error) {

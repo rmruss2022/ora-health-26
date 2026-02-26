@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { Alert } from 'react-native';
 import { speechService } from '../services/SpeechService';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 
@@ -51,9 +52,12 @@ export const usePTT = ({ onTranscript }: UsePTTOptions) => {
       const text = await speechService.transcribe(uri, apiKey);
       if (text && !abortedRef.current) {
         onTranscript(text);
+      } else if (!text && !abortedRef.current) {
+        console.warn('[usePTT] transcription returned empty result');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[usePTT] transcribe error:', err);
+      Alert.alert('Transcription failed', err?.message ?? 'Could not transcribe audio. Please try again.');
     } finally {
       setIsTranscribing(false);
     }

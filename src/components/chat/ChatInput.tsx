@@ -19,6 +19,8 @@ interface ChatInputProps {
   isRecording?: boolean;
   isTranscribing?: boolean;
   voiceAvailable?: boolean;
+  /** Transcript text to load into the input field after PTT */
+  pendingText?: string;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -30,8 +32,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isRecording = false,
   isTranscribing = false,
   voiceAvailable = false,
+  pendingText,
 }) => {
   const [text, setText] = useState('');
+  const inputRef = useRef<any>(null);
+
+  // Load transcript into the input field and focus it when it arrives
+  useEffect(() => {
+    if (pendingText) {
+      setText(pendingText);
+      inputRef.current?.focus();
+    }
+  }, [pendingText]);
 
   // Pulse animation for the mic button while recording
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -78,6 +90,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     <View style={styles.container}>
       <View style={styles.inputContainer}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           value={text}
           onChangeText={setText}
