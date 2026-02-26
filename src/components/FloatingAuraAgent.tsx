@@ -54,6 +54,11 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   const expandAnim = useRef(new Animated.Value(0)).current;
   // Prevents double-triggering within a single focus session
   const hasAutoStartedRef = useRef(false);
+  // Timer and listener refs — managed by useFocusEffect, NOT by useEffect cleanup.
+  // This prevents the auto-speak timer from being cancelled when seenToday or message
+  // state changes cause the useEffect to re-run and fire its cleanup.
+  const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTrySpeakRef = useRef<(() => void) | null>(null);
 
   const fallbackMessage = getContextualMessage(context);
   const { speak, stop, isSpeaking } = useTTS('aura');
@@ -73,8 +78,18 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
       setVisible(true);
       setExpanded(false);
       return () => {
-        // Stop speaking when the user leaves this screen
         stop();
+        // Cancel any pending speak timer on blur — NOT in useEffect cleanup, because
+        // state changes (seenToday, message) would fire that cleanup and kill the timer.
+        if (speakTimerRef.current !== null) {
+          clearTimeout(speakTimerRef.current);
+          speakTimerRef.current = null;
+        }
+        if (pendingTrySpeakRef.current && Platform.OS === 'web') {
+          document.removeEventListener('click', pendingTrySpeakRef.current);
+          document.removeEventListener('keydown', pendingTrySpeakRef.current);
+          pendingTrySpeakRef.current = null;
+        }
       };
     }, [stop])
   );
@@ -96,10 +111,9 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
 
     if (!VOICE_AGENT_ENABLED) return;
 
-    let spoken = false;
     const trySpeak = () => {
-      if (spoken) return;
-      spoken = true;
+      speakTimerRef.current = null;
+      pendingTrySpeakRef.current = null;
       speak(message);
       if (Platform.OS === 'web') {
         document.removeEventListener('click', trySpeak);
@@ -107,24 +121,17 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
       }
     };
 
-    // Attempt auto-play after assets settle (~1.2s)
-    const timer = setTimeout(trySpeak, 1200);
+    pendingTrySpeakRef.current = trySpeak;
+    speakTimerRef.current = setTimeout(trySpeak, 1200);
 
-    // Safety net: if autoplay was blocked (NotAllowedError), the ElevenLabsService
-    // will retry on the next user click. But we also hook here in case VOICE_AGENT_ENABLED
-    // changes or the service isn't ready yet.
     if (Platform.OS === 'web') {
       document.addEventListener('click', trySpeak, { once: true });
       document.addEventListener('keydown', trySpeak, { once: true });
     }
 
-    return () => {
-      clearTimeout(timer);
-      if (Platform.OS === 'web') {
-        document.removeEventListener('click', trySpeak);
-        document.removeEventListener('keydown', trySpeak);
-      }
-    };
+    // No cleanup return here — the timer and listeners are managed by useFocusEffect.
+    // Returning a cleanup would cause React to cancel the timer whenever seenToday or
+    // message state changes, which happens within milliseconds of this effect running.
   }, [loading, seenToday, speak, message, markSeen]);
 
   // Subtle pulse on the orb
