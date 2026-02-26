@@ -3,7 +3,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 
-const GEMINI_API_KEY = 'AIzaSyBxPKRtrxZB-C1yL8kcmU85XtWGN-clc6M';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const IMAGEN_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict';
 const OUTPUT_DIR = path.join(__dirname, '../ora-ai/assets/agents');
 
