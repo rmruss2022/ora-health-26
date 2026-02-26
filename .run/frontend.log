@@ -1,0 +1,22 @@
+
+> ora-ai@1.0.0 start
+> expo start -c
+
+env: load .env
+env: export API_BASE_URL EXPO_PUBLIC_API_BASE_URL EXPO_PUBLIC_ELEVENLABS_API_KEY
+Starting project at /Users/matthew/.cursor/worktrees/Feb26/bwa/frontend
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+The following packages should be updated for best compatibility with the installed expo version:
+  react-native-safe-area-context@5.7.0 - expected version: ~5.6.0
+  react-native-screens@4.24.0 - expected version: ~4.16.0
+  react-native-svg@15.15.3 - expected version: 15.12.1
+  @types/jest@30.0.0 - expected version: 29.5.14
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (860/860)
+Web Bundled 3585ms index.ts (860 modules)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 9ms src/services/api/mockAuth.ts (1 module)

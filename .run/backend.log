@@ -1,0 +1,314 @@
+
+> ora-ai-api@1.0.0 dev
+> nodemon --exec ts-node src/server.ts
+
+[33m[nodemon] 3.1.11[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: ts,json[39m
+[32m[nodemon] starting `ts-node src/server.ts`[39m
+OPENAI_API_KEY not configured, using fallback daily letters
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[WebSocket] Server initialized
+🦞 Ora AI API running on port 4000
+Environment: development
+Daily letter cron scheduled: 0 8 * * *
+📬 Daily letter cron job scheduled
+[Scheduler] Starting collective session scheduler
+[Scheduler] Running collective session scheduler...
+🧘 Collective session scheduler started
+📊 Weekly streak report scheduled (Monday 10:00 AM)
+🤖 AI agent posts scheduler started (every 6 hours)
+✓ Connected to PostgreSQL database
+Executed query {
+  text: '\n' +
+    '      SELECT id\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE scheduled_time = $1\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 22,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT id\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE scheduled_time = $1\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 1,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT id\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE scheduled_time = $1\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 1,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT id\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE scheduled_time = $1\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 0,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT id\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE scheduled_time = $1\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 1,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT \n' +
+    '        id,\n' +
+    '        scheduled_time as "scheduledTime",\n' +
+    '        duration_minutes as "durationMinutes",\n' +
+    '        started_at as "startedAt",\n' +
+    '        ended_at as "endedAt",\n' +
+    '        participant_count as "participantCount",\n' +
+    '        created_at as "createdAt",\n' +
+    '        updated_at as "updatedAt"\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE started_at IS NULL AND scheduled_time > NOW()\n' +
+    '      ORDER BY scheduled_time ASC\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 1,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT \n' +
+    '        id,\n' +
+    '        scheduled_time as "scheduledTime",\n' +
+    '        duration_minutes as "durationMinutes",\n' +
+    '        started_at as "startedAt",\n' +
+    '        ended_at as "endedAt",\n' +
+    '        participant_count as "participantCount",\n' +
+    '        created_at as "createdAt",\n' +
+    '        updated_at as "updatedAt"\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE started_at IS NULL AND scheduled_time > NOW()\n' +
+    '      ORDER BY scheduled_time ASC\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 1,
+  rows: 1
+}
+Executed query {
+  text: '\n' +
+    '      SELECT \n' +
+    '        id,\n' +
+    '        scheduled_time as "scheduledTime",\n' +
+    '        duration_minutes as "durationMinutes",\n' +
+    '        started_at as "startedAt",\n' +
+    '        ended_at as "endedAt",\n' +
+    '        participant_count as "participantCount",\n' +
+    '        created_at as "createdAt",\n' +
+    '        updated_at as "updatedAt"\n' +
+    '      FROM collective_sessions\n' +
+    '      WHERE started_at IS NOT NULL AND ended_at IS NULL\n' +
+    '      ORDER BY started_at DESC\n' +
+    '      LIMIT 1\n' +
+    '    ',
+  duration: 1,
+  rows: 0
+}
+POST /auth/login
+Executed query {
+  text: 'SELECT * FROM users WHERE email = $1 AND is_active = true',
+  duration: 7,
+  rows: 1
+}
+Login Error: Error: Invalid credentials
+    at AuthService.login (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/services/auth.service.ts:129:13)
+    at async AuthController.login (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/controllers/auth.controller.ts:87:32)
+POST /auth/register
+Executed query {
+  text: 'SELECT * FROM users WHERE email = $1 AND is_active = true',
+  duration: 1,
+  rows: 1
+}
+Register Error: Error: User already exists
+    at AuthService.register (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/services/auth.service.ts:95:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async AuthController.register (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/controllers/auth.controller.ts:30:32)
+GET /api/rooms
+Executed query {
+  text: '\n' +
+    '      SELECT \n' +
+    '        mr.id,\n' +
+    '        mr.name,\n' +
+    '        mr.description,\n' +
+    '        mr.theme,\n' +
+    '        mr.icon,\n' +
+    '        mr.tags,\n' +
+    '        mr.gradient_start as "gradientStart",\n' +
+    '        mr.gradient_end as "gradientEnd",\n' +
+    '        mr.is_active as "isActive",\n' +
+    '        mr.created_at as "createdAt",\n' +
+    '        mr.updated_at as "updatedAt",\n' +
+    '        COALESCE(\n' +
+    '          (SELECT COUNT(*) FROM room_participants \n' +
+    '           WHERE room_id = mr.id AND left_at IS NULL), \n' +
+    '          0\n' +
+    '        ) as "currentParticipants"\n' +
+    '      FROM meditation_rooms mr\n' +
+    '      WHERE mr.is_active = true\n' +
+    '      ORDER BY \n' +
+    '        CASE mr.theme\n' +
+    "          WHEN 'commons' THEN 1\n" +
+    "          WHEN 'tide-pool' THEN 2\n" +
+    "          WHEN 'starlit' THEN 3\n" +
+    "          WHEN 'forest' THEN 4\n" +
+    "          WHEN 'solo' THEN 5\n" +
+    '        END\n' +
+    '    ',
+  duration: 7,
+  rows: 5
+}
+POST /api/ora-agent/message
+Executed query {
+  text: 'SELECT context_data\n' +
+    '         FROM agent_memory_cache\n' +
+    '         WHERE user_id = $1\n' +
+    "         AND memory_type = 'full_context'\n" +
+    '         AND (expires_at IS NULL OR expires_at > NOW())\n' +
+    '         ORDER BY created_at DESC\n' +
+    '         LIMIT 1',
+  duration: 9,
+  rows: 0
+}
+Executed query {
+  text: 'WITH recent AS (\n' +
+    '          SELECT created_at::date as date, COALESCE(duration_completed, 0) as duration\n' +
+    '          FROM meditation_sessions\n' +
+    '          WHERE user_id = $1\n' +
+    "          AND created_at > NOW() - INTERVAL '90 days'\n" +
+    '          ORDER BY created_at DESC\n' +
+    '          LIMIT 10\n' +
+    '        )\n' +
+    '        SELECT\n' +
+    "          (SELECT COUNT(*) FROM meditation_sessions WHERE user_id = $1 AND created_at > NOW() - INTERVAL '90 days') as total_sessions,\n" +
+    "          (SELECT COALESCE(SUM(duration_completed), 0) FROM meditation_sessions WHERE user_id = $1 AND created_at > NOW() - INTERVAL '90 days') as total_minutes,\n" +
+    "          (SELECT json_agg(json_build_object('date', date, 'duration', duration)) FROM recent) as recent_sessions",
+  duration: 4,
+  rows: 1
+}
+✓ Connected to PostgreSQL database
+✓ Connected to PostgreSQL database
+✓ Connected to PostgreSQL database
+Database query error: error: relation "reactions" does not exist
+    at /Users/matthew/.cursor/worktrees/Feb26/bwa/backend/node_modules/pg-pool/index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async query (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/config/database.ts:27:17)
+    at async AgentMemoryService.getCommunityActivity (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/services/agent-memory.service.ts:185:22)
+    at async Promise.all (index 2)
+    at async AgentMemoryService.getUserMemoryContext (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/services/agent-memory.service.ts:75:11)
+    at async /Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/routes/ora-agent.routes.ts:88:20 {
+  length: 109,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '159',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1452',
+  routine: 'parserOpenTable'
+}
+Error fetching community activity: error: relation "reactions" does not exist
+    at /Users/matthew/.cursor/worktrees/Feb26/bwa/backend/node_modules/pg-pool/index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async query (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/config/database.ts:27:17)
+    at async AgentMemoryService.getCommunityActivity (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/services/agent-memory.service.ts:185:22)
+    at async Promise.all (index 2)
+    at async AgentMemoryService.getUserMemoryContext (/Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/services/agent-memory.service.ts:75:11)
+    at async /Users/matthew/.cursor/worktrees/Feb26/bwa/backend/src/routes/ora-agent.routes.ts:88:20 {
+  length: 109,
+  severity: 'ERROR',
+  code: '42P01',
+  detail: undefined,
+  hint: undefined,
+  position: '159',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '1452',
+  routine: 'parserOpenTable'
+}
+✓ Connected to PostgreSQL database
+Executed query {
+  text: 'SELECT \n' +
+    '          week_start_date,\n' +
+    '          intentions,\n' +
+    '          created_at\n' +
+    '         FROM weekly_plans\n' +
+    '         WHERE user_id = $1\n' +
+    '         ORDER BY week_start_date DESC\n' +
+    '         LIMIT 10',
+  duration: 24,
+  rows: 3
+}
+Executed query {
+  text: 'SELECT \n' +
+    '          created_at::date as date,\n' +
+    '          mood_score as score\n' +
+    '         FROM weekly_reviews\n' +
+    '         WHERE user_id = $1\n' +
+    '         AND mood_score IS NOT NULL\n' +
+    '         ORDER BY created_at DESC\n' +
+    '         LIMIT 12',
+  duration: 25,
+  rows: 2
+}
+Executed query {
+  text: 'SELECT \n' +
+    '          week_start_date,\n' +
+    '          reflection,\n' +
+    '          learnings,\n' +
+    '          created_at\n' +
+    '         FROM weekly_reviews\n' +
+    '         WHERE user_id = $1\n' +
+    '         ORDER BY week_start_date DESC\n' +
+    '         LIMIT 10',
+  duration: 25,
+  rows: 2
+}
+Executed query {
+  text: 'INSERT INTO agent_memory_cache\n' +
+    '         (user_id, memory_type, context_data, expires_at)\n' +
+    "         VALUES ($1, 'full_context', $2, NOW() + INTERVAL '60 minutes')\n" +
+    '         ON CONFLICT (id) DO UPDATE\n' +
+    '         SET context_data = EXCLUDED.context_data,\n' +
+    '             expires_at = EXCLUDED.expires_at,\n' +
+    '             updated_at = NOW()',
+  duration: 3,
+  rows: 1
+}

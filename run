@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$ROOT_DIR/ora-ai-api"
-DESKTOP_BACKEND_ENV="/Users/matthew/Desktop/Feb26/ora-ai-api/.env"
+BACKEND_DIR="$ROOT_DIR/backend"
+DESKTOP_BACKEND_ENV="/Users/matthew/Desktop/Feb26/backend/.env"
 RUN_DIR="$ROOT_DIR/.run"
 
 mkdir -p "$RUN_DIR"
@@ -56,7 +56,7 @@ start_frontend() {
   fi
 
   (
-    cd "$ROOT_DIR"
+    cd "$ROOT_DIR/frontend"
     export CI=false
     exec npm start -- -c
   ) >"$FRONTEND_LOG" 2>&1 &
