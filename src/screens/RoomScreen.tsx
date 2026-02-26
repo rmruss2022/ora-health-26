@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +38,30 @@ interface RoomDetails {
   participants: Participant[];
 }
 
+const ROOM_THEME_IMAGES: Record<string, any> = {
+  commons: require('../../assets/room-commons.png'),
+  'tide-pool': require('../../assets/room-tidepool.png'),
+  starlit: require('../../assets/room-starlit.png'),
+  forest: require('../../assets/room-forest.png'),
+  solo: require('../../assets/room-solo.png'),
+  garden: require('../../assets/room-commons.png'),
+};
+
+const ROOM_WELCOME_COPY: Record<string, string> = {
+  commons:
+    'Find calm in community. This garden pavilion is designed for open, welcoming group presence — perfect for beginners and experienced meditators alike.',
+  garden:
+    'Find calm in community. This garden pavilion is designed for open, welcoming group presence — perfect for beginners and experienced meditators alike.',
+  'tide-pool':
+    'Let the rhythm of the waves guide you inward. This space uses sound anchoring to help you stay present, breath by breath.',
+  starlit:
+    'Evening reflections are most powerful when you let go of the day. This clearing supports silent, open-awareness sits under a vast, imagined sky.',
+  forest:
+    'Nature grounds the nervous system. This forest nest guides you through a body-scan and slow-breath sequence inspired by time spent among trees.',
+  solo:
+    'Your private space to settle in without distraction. Focus on whatever style feels right today — breath, body, or open awareness.',
+};
+
 export const RoomScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -45,6 +70,7 @@ export const RoomScreen: React.FC = () => {
   const { roomId, roomName } = route.params as { roomId: string; roomName?: string };
 
   const [room, setRoom] = useState<RoomDetails | null>(null);
+  const [resolvedRoomId, setResolvedRoomId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasJoined, setHasJoined] = useState(false);
@@ -75,13 +101,14 @@ export const RoomScreen: React.FC = () => {
 
   useEffect(() => {
     loadRoomDetails();
-  }, [roomId]);
+  }, [roomId, roomName]);
 
   const loadRoomDetails = async () => {
     try {
       setLoading(true);
       setLoadError(null);
       const resolvedRoomId = await resolveRoomId(roomId, roomName);
+      setResolvedRoomId(resolvedRoomId);
       const data = await roomsAPI.getRoomDetails(resolvedRoomId);
       setRoom(data);
 
@@ -109,7 +136,8 @@ export const RoomScreen: React.FC = () => {
       }
 
       setShowJoinConfirm(false);
-      const data = await roomsAPI.joinRoom(roomId, {
+      const targetRoomId = resolvedRoomId || roomId;
+      const data = await roomsAPI.joinRoom(targetRoomId, {
         userId: user.id,
         userName: user.name || 'Anonymous',
       });
@@ -139,7 +167,8 @@ export const RoomScreen: React.FC = () => {
                 return;
               }
 
-              await roomsAPI.leaveRoom(roomId, user.id);
+              const targetRoomId = resolvedRoomId || roomId;
+              await roomsAPI.leaveRoom(targetRoomId, user.id);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               navigation.goBack();
             } catch (error) {
@@ -153,9 +182,10 @@ export const RoomScreen: React.FC = () => {
   };
 
   const handleStartMeditation = () => {
+    const targetRoomId = resolvedRoomId || roomId;
     // Navigate to meditation selection or timer
     navigation.navigate('MeditationTimer', {
-      roomId,
+      roomId: targetRoomId,
       roomName: room?.name,
     });
   };
@@ -203,20 +233,37 @@ export const RoomScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
         >
-          {/* Room Info */}
-          <View style={styles.roomInfo}>
-            <Text style={styles.icon}>{room.icon}</Text>
-            <Text style={styles.roomName}>{room.name}</Text>
-            <Text style={styles.description}>{room.description}</Text>
-
-            {/* Tags */}
-            <View style={styles.tags}>
-              {room.tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
+          {/* Room Hero - two-column layout */}
+          <View style={styles.heroRow}>
+            {/* Left column: title, description, tags */}
+            <View style={styles.heroLeft}>
+              <Text style={styles.roomName}>{room.name}</Text>
+              <Text style={styles.description}>{room.description}</Text>
+              <View style={styles.tags}>
+                {room.tags.map((tag, index) => (
+                  <View key={index} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
+            {/* Right column: room image */}
+            <Image
+              source={ROOM_THEME_IMAGES[room.theme] ?? ROOM_THEME_IMAGES.commons}
+              style={styles.heroImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Welcome section */}
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeTitle}>Welcome</Text>
+            <Text style={styles.welcomeBody}>
+              Here's the meditation you can do in this space.
+            </Text>
+            <Text style={styles.welcomeBody}>
+              {ROOM_WELCOME_COPY[room.theme] ?? ROOM_WELCOME_COPY.commons}
+            </Text>
           </View>
 
           {/* Participant Section */}
@@ -266,19 +313,18 @@ export const RoomScreen: React.FC = () => {
 
           {/* Action Buttons */}
           <View style={styles.actions}>
-            {!hasJoined ? (
+            <TouchableOpacity
+              style={styles.meditateButton}
+              onPress={handleStartMeditation}
+            >
+              <Text style={styles.meditateButtonText}>Start Meditation</Text>
+            </TouchableOpacity>
+            {!hasJoined && (
               <TouchableOpacity 
-                style={styles.joinButton} 
+                style={styles.joinButton}
                 onPress={showJoinConfirmation}
               >
                 <Text style={styles.joinButtonText}>Join Room</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={styles.meditateButton} 
-                onPress={handleStartMeditation}
-              >
-                <Text style={styles.meditateButtonText}>🧘 Start Meditation</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -400,33 +446,55 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
   },
-  roomInfo: {
+  heroRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
-  icon: {
-    fontSize: 64,
-    marginBottom: 16,
+  heroLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  heroImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 16,
+  },
+  welcomeSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+  },
+  welcomeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.white,
+    marginBottom: 10,
+  },
+  welcomeBody: {
+    fontSize: 15,
+    color: theme.colors.white,
+    opacity: 0.9,
+    lineHeight: 22,
+    marginBottom: 6,
   },
   roomName: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: 'bold',
     color: theme.colors.white,
-    marginBottom: 12,
-    textAlign: 'center',
+    marginBottom: 10,
   },
   description: {
-    fontSize: 16,
+    fontSize: 14,
     color: theme.colors.white,
-    opacity: 0.95,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
+    opacity: 0.9,
+    lineHeight: 20,
+    marginBottom: 12,
   },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
   },
   tag: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MeditationList, Meditation } from '../components/MeditationList';
 import { MeditationFilterModal, MeditationFilters } from '../components/MeditationFilterModal';
+import { RoomPreviewSheet } from '../components/RoomPreviewSheet';
 import { roomsAPI, MeditationRoom } from '../services/api/roomsAPI';
 import { theme } from '../theme';
 
@@ -91,6 +92,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filters, setFilters] = useState<MeditationFilters>({});
+  const [previewRoom, setPreviewRoom] = useState<Room | null>(null);
 
   const ROOMS_DATA: Room[] = [
     {
@@ -210,6 +212,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const handleRoomPress = (room: Room) => {
+    setPreviewRoom(room);
+  };
+
+  const handleJoinFromSheet = (room: Room) => {
+    setPreviewRoom(null);
     navigation?.navigate('Room', { roomId: room.id, roomName: room.name });
   };
 
@@ -377,6 +384,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
         </View>
       </ScrollView>
+
+      <RoomPreviewSheet
+        room={previewRoom}
+        onClose={() => setPreviewRoom(null)}
+        onJoin={handleJoinFromSheet}
+      />
 
       <MeditationFilterModal
         visible={filterModalVisible}
