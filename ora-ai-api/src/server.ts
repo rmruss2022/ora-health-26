@@ -15,6 +15,7 @@ import reactionsRoutes from './routes/reactions.routes';
 import collectiveRoutes from './routes/collective.routes';
 import reflectionRoutes from './routes/reflection.routes';
 import roomRoutes from './routes/room.routes';
+import oraAgentRoutes from './routes/ora-agent.routes';
 // Temporarily disabled due to TS errors - fix later
 // import agentRoutes from './routes/agent.routes';
 // import quizRoutes from './routes/quiz.routes';
@@ -92,6 +93,7 @@ app.use('/api/reactions', reactionsRoutes);
 app.use('/api/collective', collectiveRoutes);
 app.use('/api/reflections', reflectionRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/ora-agent', oraAgentRoutes);
 // Temporarily disabled - fix TS errors later
 // app.use('/api/agents', agentRoutes);
 // app.use('/api/quiz', quizRoutes);

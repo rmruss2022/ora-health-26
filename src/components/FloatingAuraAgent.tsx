@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTTS } from '../hooks/useTTS';
 import { useAuraSeenToday } from '../hooks/useAuraSeenToday';
+import { useAgentContext } from '../hooks/useAgentContext';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 import { theme } from '../theme';
 
@@ -54,9 +55,14 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   // Prevents double-triggering within a single focus session
   const hasAutoStartedRef = useRef(false);
 
-  const message = getContextualMessage(context);
+  const fallbackMessage = getContextualMessage(context);
   const { speak, stop, isSpeaking } = useTTS('aura');
-  const { seenToday, markSeen, loading } = useAuraSeenToday(context);
+  const { seenToday, markSeen, loading: seenLoading } = useAuraSeenToday(context);
+  const { message: dynamicMessage, loading: messageLoading } = useAgentContext(context);
+
+  // Use AI-generated message while it loads; fall back to static if API fails
+  const message = dynamicMessage || fallbackMessage;
+  const loading = seenLoading || messageLoading;
 
   // On every screen focus: reset per-focus state and stop any leftover audio.
   // This ensures returning to the screen (tab switch or back navigation) re-evaluates

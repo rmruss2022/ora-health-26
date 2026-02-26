@@ -39,6 +39,9 @@ const MODES = [
   { id: 'planning', label: 'Plan' },
 ];
 
+// Per-session flag: resets when the JS bundle restarts (app restart), persists across tab switches
+let chatIntroSent = false;
+
 export const ChatScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
@@ -92,6 +95,19 @@ export const ChatScreen: React.FC = () => {
   useEffect(() => {
     stop();
   }, [selectedPersona]);
+
+  // Auto-TTS the opening message once per session (first time Chat is opened)
+  useEffect(() => {
+    if (!VOICE_AGENT_ENABLED) return;
+    if (chatIntroSent) return;
+    // Only fire when the welcome message is the sole message
+    if (messages.length === 1 && messages[0].id === 'welcome') {
+      chatIntroSent = true;
+      setSpeakingMessageId(messages[0].id);
+      const timer = setTimeout(() => speak(messages[0].content), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
 
   const handleSpeak = useCallback(
     (id: string, content: string) => {
