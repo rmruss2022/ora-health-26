@@ -44,13 +44,19 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
   context = 'home',
   onDismiss,
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [visible, setVisible] = useState(true);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const expandAnim = useRef(new Animated.Value(0)).current;
 
   const message = getContextualMessage(context);
   const { speak, stop, isSpeaking } = useTTS('aura');
+
+  // Auto-speak on first open
+  useEffect(() => {
+    const timer = setTimeout(() => speak(message), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Subtle pulse on the orb
   useEffect(() => {
@@ -181,7 +187,7 @@ const ORB_SIZE = 52;
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: 96, // sit above tab bar (76) + 20 gap
+    bottom: 84, // just above 76px tab bar
     left: 20,
     alignItems: 'flex-start',
     zIndex: 999,
