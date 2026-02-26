@@ -11,7 +11,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTTS } from '../hooks/useTTS';
-import { useAuraSeenToday } from '../hooks/useAuraSeenToday';
 import { useAgentContext } from '../hooks/useAgentContext';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 import { theme } from '../theme';
@@ -25,13 +24,12 @@ interface FloatingAuraAgentProps {
 
 const getContextualMessage = (context: AuraContext): string => {
   const hour = new Date().getHours();
-  const day = new Date().getDay(); // 0=Sun
+  const day = new Date().getDay();
 
   if (context === 'community') {
     return 'You have new activity in your letters and community today. Want to check your inbox first or write something?';
   }
 
-  // Home context — time-aware
   if (hour >= 5 && hour < 12) {
     return "Good morning. Your affirmation today is: 'I am kind to myself.' Want to start with a short meditation or a quick journal check-in?";
   }
@@ -50,37 +48,123 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [visible, setVisible] = useState(true);
+
+  // Animation values
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const expandAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(56)).current;
+  const scaleAnim = useRef(new Animated.Value(0.78)).current;
+  const rotateAnim = useRef(new Animated.Value(-4)).current;
+
   // Prevents double-triggering within a single focus session
   const hasAutoStartedRef = useRef(false);
-  // Timer and listener refs — managed by useFocusEffect, NOT by useEffect cleanup.
-  // This prevents the auto-speak timer from being cancelled when seenToday or message
-  // state changes cause the useEffect to re-run and fire its cleanup.
+  // Timer/listener refs — cleared on blur, NOT via useEffect cleanup
   const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTrySpeakRef = useRef<(() => void) | null>(null);
 
   const fallbackMessage = getContextualMessage(context);
   const { speak, stop, isSpeaking } = useTTS('aura');
-  const { seenToday, markSeen, loading: seenLoading } = useAuraSeenToday(context);
-  const { message: dynamicMessage, loading: messageLoading } = useAgentContext(context);
+  const { message: dynamicMessage } = useAgentContext(context);
 
-  // Use AI-generated message while it loads; fall back to static if API fails
+  // Always use the most current message when TTS fires
   const message = dynamicMessage || fallbackMessage;
-  const loading = seenLoading || messageLoading;
+  const messageRef = useRef(message);
+  useEffect(() => { messageRef.current = message; }, [message]);
 
-  // On every screen focus: reset per-focus state and stop any leftover audio.
-  // This ensures returning to the screen (tab switch or back navigation) re-evaluates
-  // whether to auto-show, rather than staying stale from a previous visit.
+  // Animate bubble in/out
+  useEffect(() => {
+    if (expanded) {
+      // Entrance: slide up from below + scale + slight tilt → straight
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          tension: 62,
+          friction: 10,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 62,
+          friction: 10,
+          useNativeDriver: true,
+        }),
+        Animated.spring(rotateAnim, {
+          toValue: 0,
+          tension: 62,
+          friction: 10,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Exit: quick fade + drop
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 56,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.78,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotateAnim, {
+          toValue: -4,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [expanded]);
+
+  // On every screen focus: reset state, auto-expand, auto-speak
   useFocusEffect(
     useCallback(() => {
       hasAutoStartedRef.current = false;
       setVisible(true);
       setExpanded(false);
+
+      // Small settle delay so the screen finishes mounting before we pop in
+      const expandTimer = setTimeout(() => {
+        if (hasAutoStartedRef.current) return;
+        hasAutoStartedRef.current = true;
+        setExpanded(true);
+
+        if (!VOICE_AGENT_ENABLED) return;
+
+        const trySpeak = () => {
+          speakTimerRef.current = null;
+          pendingTrySpeakRef.current = null;
+          // Use messageRef to get the latest message (AI may have loaded by now)
+          speak(messageRef.current);
+          if (Platform.OS === 'web') {
+            document.removeEventListener('click', trySpeak);
+            document.removeEventListener('keydown', trySpeak);
+          }
+        };
+
+        pendingTrySpeakRef.current = trySpeak;
+        speakTimerRef.current = setTimeout(trySpeak, 1200);
+
+        if (Platform.OS === 'web') {
+          document.addEventListener('click', trySpeak, { once: true });
+          document.addEventListener('keydown', trySpeak, { once: true });
+        }
+      }, 300);
+
       return () => {
+        clearTimeout(expandTimer);
         stop();
-        // Cancel any pending speak timer on blur — NOT in useEffect cleanup, because
-        // state changes (seenToday, message) would fire that cleanup and kill the timer.
         if (speakTimerRef.current !== null) {
           clearTimeout(speakTimerRef.current);
           speakTimerRef.current = null;
@@ -91,81 +175,24 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
           pendingTrySpeakRef.current = null;
         }
       };
-    }, [stop])
+    }, [stop, speak])
   );
 
-  // Auto-expand + auto-speak on first daily visit.
-  // Fires whenever loading resolves OR seenToday changes (which happens on each focus
-  // because useAuraSeenToday resets to null then resolves the AsyncStorage check).
-  useEffect(() => {
-    // Wait for AsyncStorage check to finish
-    if (loading) return;
-    // Already shown today — stay quiet and collapsed
-    if (seenToday) return;
-    // Prevent double-fire within one focus session
-    if (hasAutoStartedRef.current) return;
-
-    hasAutoStartedRef.current = true;
-    setExpanded(true);
-    markSeen(); // persist today's date immediately so rapid nav doesn't double-show
-
-    if (!VOICE_AGENT_ENABLED) return;
-
-    const trySpeak = () => {
-      speakTimerRef.current = null;
-      pendingTrySpeakRef.current = null;
-      speak(message);
-      if (Platform.OS === 'web') {
-        document.removeEventListener('click', trySpeak);
-        document.removeEventListener('keydown', trySpeak);
-      }
-    };
-
-    pendingTrySpeakRef.current = trySpeak;
-    speakTimerRef.current = setTimeout(trySpeak, 1200);
-
-    if (Platform.OS === 'web') {
-      document.addEventListener('click', trySpeak, { once: true });
-      document.addEventListener('keydown', trySpeak, { once: true });
-    }
-
-    // No cleanup return here — the timer and listeners are managed by useFocusEffect.
-    // Returning a cleanup would cause React to cancel the timer whenever seenToday or
-    // message state changes, which happens within milliseconds of this effect running.
-  }, [loading, seenToday, speak, message, markSeen]);
-
-  // Subtle pulse on the orb
+  // Subtle orb pulse
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 2000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
 
-  // Expand/collapse bubble animation
-  useEffect(() => {
-    Animated.spring(expandAnim, {
-      toValue: expanded ? 1 : 0,
-      useNativeDriver: true,
-      tension: 120,
-      friction: 10,
-    }).start();
-  }, [expanded]);
-
   const handleDismiss = () => {
     stop();
+    setExpanded(false);
     setVisible(false);
     onDismiss?.();
   };
@@ -178,11 +205,15 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
     }
   };
 
+  const rotateDeg = rotateAnim.interpolate({
+    inputRange: [-4, 0],
+    outputRange: ['-4deg', '0deg'],
+  });
+
   if (!visible) return null;
 
   return (
     <View style={styles.wrapper} pointerEvents="box-none">
-      {/* Backdrop closes bubble on tap outside */}
       {expanded && (
         <Pressable style={styles.backdrop} onPress={() => setExpanded(false)} />
       )}
@@ -191,20 +222,11 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
         style={[
           styles.bubbleContainer,
           {
-            opacity: expandAnim,
+            opacity: opacityAnim,
             transform: [
-              {
-                scale: expandAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.85, 1],
-                }),
-              },
-              {
-                translateY: expandAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [12, 0],
-                }),
-              },
+              { translateY: translateYAnim },
+              { scale: scaleAnim },
+              { rotate: rotateDeg },
             ],
           },
         ]}
@@ -234,7 +256,6 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
             </TouchableOpacity>
           )}
         </View>
-        {/* Tail */}
         <View style={styles.tail} />
       </Animated.View>
 
