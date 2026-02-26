@@ -17,6 +17,7 @@ import { ChatMessage } from '../components/chat/ChatMessage';
 import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
 import { useTTS } from '../hooks/useTTS';
+import { usePTT } from '../hooks/usePTT';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
 import { theme } from '../theme';
 
@@ -101,6 +102,28 @@ export const ChatScreen: React.FC = () => {
     },
     [speak, stop, isSpeaking, speakingMessageId]
   );
+
+  // Voice mode: auto-play assistant responses after PTT is used
+  const [voiceMode, setVoiceMode] = useState(false);
+  const prevMsgCountRef = useRef(0);
+  useEffect(() => {
+    const count = messages.length;
+    if (voiceMode && count > prevMsgCountRef.current) {
+      const last = messages[count - 1];
+      if (last?.role === 'assistant') {
+        setSpeakingMessageId(last.id);
+        speak(last.content);
+      }
+    }
+    prevMsgCountRef.current = count;
+  }, [messages]);
+
+  const { isRecording, isTranscribing, startListening, stopListening } = usePTT({
+    onTranscript: (text) => {
+      setVoiceMode(true);
+      sendMessage(text);
+    },
+  });
 
   return (
     <KeyboardAvoidingView
@@ -233,6 +256,11 @@ export const ChatScreen: React.FC = () => {
         onSend={sendMessage}
         isLoading={isLoading}
         placeholder="Type a message..."
+        voiceAvailable={VOICE_AGENT_ENABLED}
+        onStartListening={startListening}
+        onStopListening={stopListening}
+        isRecording={isRecording}
+        isTranscribing={isTranscribing}
       />
     </KeyboardAvoidingView>
   );
