@@ -39,9 +39,6 @@ const MODES = [
   { id: 'planning', label: 'Plan' },
 ];
 
-// Per-session flag: resets when the JS bundle restarts (app restart), persists across tab switches
-let chatIntroSent = false;
-
 export const ChatScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
@@ -81,10 +78,25 @@ export const ChatScreen: React.FC = () => {
   const selectedBehaviorId = behaviorIdMap[selectedMode] || 'free-form-chat';
   const selectedModeLabel = MODES.find((mode) => mode.id === selectedMode)?.label || 'Free Flow';
 
-  const { messages, isLoading, sendMessage } = useChat(selectedBehaviorId, selectedPersona);
-
-  const { speak, stop, isSpeaking } = useTTS(selectedPersona);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  // Track which message IDs have already been spoken so we never double-speak
+  const spokenIdsRef = useRef(new Set<string>());
+
+  const { speak, stop, isSpeaking, queueSpeak } = useTTS(selectedPersona);
+
+  const { messages, isLoading, sendMessage } = useChat(
+    selectedBehaviorId,
+    selectedPersona,
+    {
+      onSegment: (text, messageId) => {
+        // Mark as spoken so the end-of-stream auto-speak doesn't re-fire
+        spokenIdsRef.current.add(messageId);
+        setSpeakingMessageId(messageId);
+        queueSpeak(text);
+      },
+    }
+  );
 
   // Clear speaking state when playback finishes
   useEffect(() => {
@@ -95,19 +107,6 @@ export const ChatScreen: React.FC = () => {
   useEffect(() => {
     stop();
   }, [selectedPersona]);
-
-  // Auto-TTS the opening message once per session (first time Chat is opened)
-  useEffect(() => {
-    if (!VOICE_AGENT_ENABLED) return;
-    if (chatIntroSent) return;
-    // Only fire when the welcome message is the sole message
-    if (messages.length === 1 && messages[0].id === 'welcome') {
-      chatIntroSent = true;
-      setSpeakingMessageId(messages[0].id);
-      const timer = setTimeout(() => speak(messages[0].content), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [messages]);
 
   const handleSpeak = useCallback(
     (id: string, content: string) => {
@@ -121,25 +120,28 @@ export const ChatScreen: React.FC = () => {
     [speak, stop, isSpeaking, speakingMessageId]
   );
 
-  // Voice mode: auto-play assistant responses after PTT is used
-  const [voiceMode, setVoiceMode] = useState(false);
-  const prevMsgCountRef = useRef(0);
+  // Clear spoken history when the conversation resets (mode or persona switch)
   useEffect(() => {
-    const count = messages.length;
-    if (voiceMode && count > prevMsgCountRef.current) {
-      const last = messages[count - 1];
-      if (last?.role === 'assistant') {
-        setSpeakingMessageId(last.id);
-        speak(last.content);
-      }
-    }
-    prevMsgCountRef.current = count;
+    spokenIdsRef.current.clear();
+  }, [selectedBehaviorId, selectedPersona]);
+
+  // Auto-speak every new complete assistant message (streaming or non-streaming)
+  useEffect(() => {
+    if (!VOICE_AGENT_ENABLED) return;
+    const last = messages[messages.length - 1];
+    // Skip if no message, not assistant, still streaming, or already spoken
+    if (!last || last.role !== 'assistant' || last.isStreaming) return;
+    if (spokenIdsRef.current.has(last.id)) return;
+    spokenIdsRef.current.add(last.id);
+    setSpeakingMessageId(last.id);
+    speak(last.content);
   }, [messages]);
+
+  const [pendingInput, setPendingInput] = useState('');
 
   const { isRecording, isTranscribing, startListening, stopListening } = usePTT({
     onTranscript: (text) => {
-      setVoiceMode(true);
-      sendMessage(text);
+      setPendingInput(text);
     },
   });
 
@@ -307,7 +309,7 @@ export const ChatScreen: React.FC = () => {
 
       {/* Input */}
       <ChatInput
-        onSend={sendMessage}
+        onSend={(text) => { sendMessage(text); setPendingInput(''); }}
         isLoading={isLoading}
         placeholder="Type a message..."
         voiceAvailable={VOICE_AGENT_ENABLED}
@@ -315,6 +317,7 @@ export const ChatScreen: React.FC = () => {
         onStopListening={stopListening}
         isRecording={isRecording}
         isTranscribing={isTranscribing}
+        pendingText={pendingInput}
       />
     </KeyboardAvoidingView>
   );

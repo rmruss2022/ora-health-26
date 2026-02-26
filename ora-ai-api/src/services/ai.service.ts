@@ -4,6 +4,7 @@ import { postgresService } from './postgres.service';
 import { aiTools, aiToolsService } from './ai-tools.service';
 import { behaviorDetectionService } from './behavior-detection.service';
 import { BEHAVIORS } from '../config/behaviors';
+import { agentMemoryService } from './agent-memory.service';
 
 type KimiErrorCategory =
   | 'timeout'
@@ -150,6 +151,107 @@ export class AIService {
     return this.getProvider() === 'mock';
   }
 
+  /**
+   * Stream an Anthropic response via SSE.
+   * Calls onChunk for each text delta, onDone when complete, onError on failure.
+   * Falls back to the non-streaming Anthropic path if streaming is unavailable.
+   */
+  async streamMessageWithAnthropic(
+    userId: string,
+    message: string,
+    behaviorId: string,
+    onChunk: (text: string) => void,
+    onDone: (fullText: string) => void,
+    onError: (err: Error) => void
+  ): Promise<void> {
+    let activeBehaviorId = behaviorId;
+
+    try {
+      const history = await postgresService.getChatHistory(userId, 10);
+
+      const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
+      const explicitlySelectedBehavior =
+        requestedBehavior && requestedBehavior !== 'free-form-chat'
+          ? BEHAVIORS.find((b) => b.id === requestedBehavior)
+          : undefined;
+
+      let activeBehavior = explicitlySelectedBehavior;
+
+      if (!activeBehavior) {
+        const detection = await behaviorDetectionService.detectBehavior(message, userId, history);
+        activeBehavior = detection.behavior;
+      }
+
+      activeBehaviorId = activeBehavior.id;
+
+      // Build system prompt with memory context (same as sendMessageWithAnthropic)
+      let memoryContext = '';
+      try {
+        const userMemory = await agentMemoryService.getUserMemoryContext(userId);
+        memoryContext = agentMemoryService.formatContextForPrompt(userMemory);
+      } catch (_) {
+        // Memory fetch failure should not block chat
+      }
+
+      const systemPrompt = memoryContext
+        ? `${activeBehavior.instructions.systemPrompt}\n\n---USER CONTEXT---\n${memoryContext}\n---END USER CONTEXT---`
+        : activeBehavior.instructions.systemPrompt;
+
+      const client = getAnthropicClient();
+      const anthropicMessages = [
+        ...history.map((msg) => ({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.content,
+        })),
+        { role: 'user' as const, content: message },
+      ];
+
+      // Save user message before streaming begins
+      await postgresService.saveChatMessage({
+        userId,
+        role: 'user',
+        content: message,
+        behaviorId: activeBehavior.id,
+      });
+
+      let fullText = '';
+
+      const stream = await client.messages.stream({
+        model: ANTHROPIC_CONFIG.model,
+        max_tokens: ANTHROPIC_CONFIG.maxTokens,
+        system: systemPrompt,
+        messages: anthropicMessages as any,
+      });
+
+      for await (const event of stream) {
+        if (
+          event.type === 'content_block_delta' &&
+          (event.delta as any)?.type === 'text_delta' &&
+          (event.delta as any).text
+        ) {
+          const chunk: string = (event.delta as any).text;
+          fullText += chunk;
+          onChunk(chunk);
+        }
+      }
+
+      if (!fullText) fullText = "I'm here with you.";
+
+      await postgresService.saveChatMessage({
+        userId,
+        role: 'assistant',
+        content: fullText,
+        behaviorId: activeBehavior.id,
+        metadata: { model: ANTHROPIC_CONFIG.model, behaviorName: activeBehavior.name },
+      });
+
+      onDone(fullText);
+    } catch (err: any) {
+      console.error('Anthropic streaming error:', err);
+      onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
   async sendMessage(
     userId: string,
     message: string,
@@ -251,6 +353,19 @@ export class AIService {
       activeBehaviorName = activeBehavior.name;
       activeBehaviorId = activeBehavior.id;
 
+      // Fetch user memory context
+      let memoryContext = '';
+      try {
+        const userMemory = await agentMemoryService.getUserMemoryContext(userId);
+        memoryContext = agentMemoryService.formatContextForPrompt(userMemory);
+      } catch (_) {
+        // Memory fetch failure should not block chat
+      }
+
+      const systemPrompt = memoryContext
+        ? `${activeBehavior.instructions.systemPrompt}\n\n---USER CONTEXT---\n${memoryContext}\n---END USER CONTEXT---`
+        : activeBehavior.instructions.systemPrompt;
+
       const client = getAnthropicClient();
       const anthropicMessages = [
         ...history.map((msg) => ({
@@ -266,7 +381,7 @@ export class AIService {
       const completion = await client.messages.create({
         model: ANTHROPIC_CONFIG.model,
         max_tokens: ANTHROPIC_CONFIG.maxTokens,
-        system: activeBehavior.instructions.systemPrompt,
+        system: systemPrompt,
         messages: anthropicMessages as any,
       });
 

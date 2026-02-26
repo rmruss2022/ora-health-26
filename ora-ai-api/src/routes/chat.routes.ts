@@ -7,6 +7,7 @@ const router = Router();
 // router.use(authenticateToken); // Disabled for testing
 
 router.post('/messages', chatController.sendMessage);
+router.post('/stream', chatController.streamMessage);
 router.get('/history', chatController.getChatHistory);
 router.post('/behavior', chatController.switchBehavior);
 router.get('/behavior', chatController.getCurrentBehavior);

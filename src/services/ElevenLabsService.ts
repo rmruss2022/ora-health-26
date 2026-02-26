@@ -24,10 +24,55 @@ class ElevenLabsService {
   private currentSound: Sound | null = null;
   private currentWebAudio: HTMLAudioElement | null = null;
   private _isActive = false;
+  private _isBlocked = false;
   /** Stored so stop() can remove it if we're waiting for a user gesture */
   private pendingUnlock: (() => void) | null = null;
+  /** Timer ID for the autoplay-retry delay */
+  private pendingUnlockTimer: ReturnType<typeof setTimeout> | null = null;
   /** Lets stop() resolve the playWeb() promise so callers don't hang */
   private resolveCurrentPlayback: (() => void) | null = null;
+  /** Lets stop() resolve the playNative() promise so callers don't hang */
+  private resolveCurrentNativePlayback: (() => void) | null = null;
+  /** Active stream reader — cancelled by stop() to abort mid-stream */
+  private currentReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  /** Subscriptions for blocked state changes */
+  private blockedListeners: ((blocked: boolean) => void)[] = [];
+  /** TTS queue for streaming batch playback */
+  private speakQueue: string[] = [];
+  private queueVoiceId = '';
+  private queueRunning = false;
+  /** Incremented on every stop() so stale drainQueue() calls can detect they're outdated */
+  private drainGeneration = 0;
+  private idleListeners: (() => void)[] = [];
+
+  private setBlocked(blocked: boolean) {
+    this._isBlocked = blocked;
+    this.blockedListeners.forEach((l) => l(blocked));
+  }
+
+  get isBlocked(): boolean {
+    return this._isBlocked;
+  }
+
+  /** Subscribe to blocked state changes. Returns an unsubscribe function. */
+  onBlockedChange(listener: (blocked: boolean) => void): () => void {
+    this.blockedListeners.push(listener);
+    return () => {
+      this.blockedListeners = this.blockedListeners.filter((l) => l !== listener);
+    };
+  }
+
+  /** Subscribe to queue-idle (queue drained) events. Returns an unsubscribe function. */
+  onIdle(listener: () => void): () => void {
+    this.idleListeners.push(listener);
+    return () => {
+      this.idleListeners = this.idleListeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notifyIdle(): void {
+    this.idleListeners.forEach((l) => l());
+  }
 
   private apiKey(): string | undefined {
     return (process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY as string | undefined)?.trim() || undefined;
@@ -37,48 +82,171 @@ class ElevenLabsService {
     return this._isActive;
   }
 
+  /**
+   * Convert *action text* → [action text] for eleven_v3 native expression rendering.
+   * The model will render sighs, breaths, laughs etc. natively from bracket notation.
+   */
+  private cleanForTTS(text: string): string {
+    return text
+      .replace(/\*([^*]+)\*/g, '[$1]') // *takes a breath* → [takes a breath]
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   async speak(text: string, voiceId: string): Promise<void> {
     const key = this.apiKey();
     if (!key) {
       console.log('[ElevenLabsService] speak() skipped — no API key');
       return;
     }
-
-    console.log('[ElevenLabsService] speak() start | voiceId:', voiceId, '| chars:', text.length);
+    this.speakQueue = []; // clear any pending queue
+    const cleaned = this.cleanForTTS(text);
+    console.log('[ElevenLabsService] speak() start | voiceId:', voiceId);
     await this.stop();
     this._isActive = true;
-
     try {
-      console.log('[ElevenLabsService] fetching TTS audio...');
-      const response = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}`, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': key,
-          'Content-Type': 'application/json',
-          Accept: 'audio/mpeg',
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_turbo_v2_5',
-          // speed: 0.7–1.2 (default 1.0). 1.25 = brisker without sounding rushed
-          speed: 1.25,
-          voice_settings: { stability: 0.65, similarity_boost: 0.75 },
-        }),
-      });
-
-      if (!response.ok) throw new Error(`ElevenLabs API error: ${response.status}`);
-      console.log('[ElevenLabsService] fetch OK (' + response.status + '), starting playback...');
-
-      if (Platform.OS === 'web') {
-        await this.playWeb(response);
-      } else {
-        await this.playNative(response);
-      }
+      await this.fetchAndPlay(cleaned, voiceId, key);
+      this._isActive = false;
       console.log('[ElevenLabsService] speak() done');
     } catch (err) {
       this._isActive = false;
       console.error('[ElevenLabsService] speak() error:', err);
     }
+  }
+
+  private async fetchAndPlay(text: string, voiceId: string, key: string): Promise<void> {
+    const response = await fetch(`${ELEVENLABS_BASE}/text-to-speech/${voiceId}/stream`, {
+      method: 'POST',
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+      body: JSON.stringify({ text, model_id: 'eleven_v3', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+    });
+    if (!response.ok) { console.warn('[ElevenLabsService] TTS failed:', response.status); return; }
+    if (Platform.OS === 'web') await this.playWebStream(response);
+    else await this.playNative(response);
+  }
+
+  async queueSpeak(text: string, voiceId: string): Promise<void> {
+    const key = this.apiKey();
+    if (!key) return;
+    const cleaned = this.cleanForTTS(text);
+    if (!cleaned) return;
+    this.speakQueue.push(cleaned);
+    this.queueVoiceId = voiceId;
+    if (!this.queueRunning) {
+      this._isActive = true;
+      this.queueRunning = true;
+      const gen = this.drainGeneration;
+      this.drainQueue(key, gen).catch((err) => console.error('[ElevenLabsService] drainQueue error:', err));
+    }
+  }
+
+  private async drainQueue(key: string, gen: number): Promise<void> {
+    try {
+      while (this.speakQueue.length > 0 && this._isActive && gen === this.drainGeneration) {
+        const text = this.speakQueue.shift()!;
+        await this.fetchAndPlay(text, this.queueVoiceId, key);
+      }
+    } finally {
+      // Only update shared state if this drain is still the current generation
+      if (gen === this.drainGeneration) {
+        this.queueRunning = false;
+        if (this.speakQueue.length === 0) {
+          this._isActive = false;
+          this.notifyIdle();
+        }
+      }
+    }
+  }
+
+  /**
+   * Web (primary): MediaSource streaming — starts playback on first chunk so
+   * there's no wait for the full download. Falls back to blob if MediaSource
+   * doesn't support audio/mpeg (Firefox) or if the response has no body.
+   */
+  private async playWebStream(response: Response): Promise<void> {
+    const MS = (window as any).MediaSource as typeof MediaSource | undefined;
+    if (!MS || !MS.isTypeSupported('audio/mpeg') || !response.body) {
+      return this.playWeb(response);
+    }
+
+    const mediaSource = new MS();
+    const url = URL.createObjectURL(mediaSource);
+
+    return new Promise<void>((resolve) => {
+      this.resolveCurrentPlayback = resolve;
+      const audio = new (window as any).Audio(url) as HTMLAudioElement;
+      this.currentWebAudio = audio;
+
+      const cleanup = (reason: string) => {
+        console.log('[ElevenLabsService] playWebStream cleanup —', reason);
+        URL.revokeObjectURL(url);
+        this.currentWebAudio = null;
+        this.resolveCurrentPlayback = null;
+        resolve();
+      };
+
+      audio.onended = () => cleanup('ended');
+      audio.onerror = () => cleanup('error');
+
+      mediaSource.addEventListener('sourceopen', async () => {
+        let sb: SourceBuffer;
+        try {
+          sb = mediaSource.addSourceBuffer('audio/mpeg');
+        } catch {
+          cleanup('mime-unsupported');
+          return;
+        }
+
+        const waitUpdate = () =>
+          new Promise<void>((res) => sb.addEventListener('updateend', res, { once: true }));
+
+        const reader = response.body!.getReader();
+        this.currentReader = reader;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (!this._isActive) { reader.cancel(); break; }
+            if (done) {
+              if (sb.updating) await waitUpdate();
+              if (mediaSource.readyState === 'open') mediaSource.endOfStream();
+              break;
+            }
+            if (sb.updating) await waitUpdate();
+            sb.appendBuffer(value);
+          }
+        } catch {
+          try { if (mediaSource.readyState === 'open') mediaSource.endOfStream('decode'); } catch {}
+        } finally {
+          this.currentReader = null;
+        }
+      });
+
+      audio.play().catch((err: Error) => {
+        if (err?.name === 'NotAllowedError') {
+          this.setBlocked(true);
+          let fired = false;
+          const unlock = () => {
+            if (fired) return;
+            fired = true;
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('touchstart', unlock);
+            this.pendingUnlock = null;
+            this.setBlocked(false);
+            if (this.currentWebAudio === audio) {
+              audio.play().catch(() => cleanup('retry-failed'));
+            } else {
+              resolve();
+            }
+          };
+          this.pendingUnlock = unlock;
+          document.addEventListener('click', unlock, { once: true });
+          document.addEventListener('touchstart', unlock, { once: true });
+        } else {
+          cleanup('play-rejected-' + err?.name);
+        }
+      });
+    });
   }
 
   /**
@@ -104,7 +272,6 @@ class ElevenLabsService {
       const cleanup = (reason: string) => {
         console.log('[ElevenLabsService] playWeb() cleanup —', reason);
         URL.revokeObjectURL(url);
-        this._isActive = false;
         this.currentWebAudio = null;
         this.resolveCurrentPlayback = null;
         resolve();
@@ -124,11 +291,23 @@ class ElevenLabsService {
           console.warn('[ElevenLabsService] audio.play() rejected:', err?.name, err?.message);
 
           if (err?.name === 'NotAllowedError') {
-            // Autoplay blocked — stay active, unlock on first user interaction
-            console.log('[ElevenLabsService] autoplay blocked — waiting for user gesture');
+            // Autoplay blocked — auto-retry after 1 s (user likely interacted by then)
+            // Also retries immediately on click/touchstart for instant response.
+            console.log('[ElevenLabsService] autoplay blocked — auto-retrying in 1 s');
+            this.setBlocked(true);
+            let fired = false;
             const unlock = () => {
-              console.log('[ElevenLabsService] user gesture received — retrying audio.play()');
+              if (fired) return;
+              fired = true;
+              if (this.pendingUnlockTimer !== null) {
+                clearTimeout(this.pendingUnlockTimer);
+                this.pendingUnlockTimer = null;
+              }
+              document.removeEventListener('click', unlock);
+              document.removeEventListener('touchstart', unlock);
               this.pendingUnlock = null;
+              this.setBlocked(false);
+              console.log('[ElevenLabsService] unlock — retrying audio.play()');
               if (this.currentWebAudio === audio) {
                 audio.play()
                   .then(() => {
@@ -157,35 +336,45 @@ class ElevenLabsService {
   private async playNative(response: Response): Promise<void> {
     const buffer = await response.arrayBuffer();
     const uri = `data:audio/mpeg;base64,${this.toBase64(buffer)}`;
-
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-    });
-
-    const { sound } = await Audio.Sound.createAsync(
-      { uri },
-      { shouldPlay: true, volume: 1.0 },
-      (status) => {
+    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true });
+    const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true, volume: 1.0 });
+    this.currentSound = sound;
+    await new Promise<void>((resolve) => {
+      this.resolveCurrentNativePlayback = resolve;
+      sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
-          this._isActive = false;
+          this.resolveCurrentNativePlayback = null;
           sound.unloadAsync().catch(() => {});
           this.currentSound = null;
+          resolve();
         }
-      }
-    );
-    this.currentSound = sound;
+      });
+    });
   }
 
   async stop(): Promise<void> {
     console.log('[ElevenLabsService] stop()');
 
-    // Remove any pending autoplay-unlock listener so it doesn't fire after stop
+    // Clear the TTS queue and invalidate any running drain
+    this.speakQueue = [];
+    this.queueRunning = false;
+    this.drainGeneration++;
+
+    // Remove any pending unlock listener so it doesn't fire after stop
     if (this.pendingUnlock) {
       document.removeEventListener('click', this.pendingUnlock);
       document.removeEventListener('touchstart', this.pendingUnlock);
       this.pendingUnlock = null;
+    }
+
+    if (this.pendingUnlockTimer !== null) {
+      clearTimeout(this.pendingUnlockTimer);
+      this.pendingUnlockTimer = null;
+    }
+
+    if (this.currentReader) {
+      this.currentReader.cancel().catch(() => {});
+      this.currentReader = null;
     }
 
     if (this.currentWebAudio) {
@@ -199,6 +388,12 @@ class ElevenLabsService {
       this.resolveCurrentPlayback = null;
     }
 
+    // Resolve the playNative() promise so the queue drain loop can exit
+    if (this.resolveCurrentNativePlayback) {
+      this.resolveCurrentNativePlayback();
+      this.resolveCurrentNativePlayback = null;
+    }
+
     if (this.currentSound) {
       try {
         await this.currentSound.stopAsync();
@@ -208,6 +403,7 @@ class ElevenLabsService {
     }
 
     this._isActive = false;
+    this.setBlocked(false);
   }
 
   private toBase64(buffer: ArrayBuffer): string {

@@ -1,13 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+import type { Message } from '../../hooks/useChat';
 
 interface ChatMessageProps {
   message: Message;
@@ -17,8 +11,33 @@ interface ChatMessageProps {
   isSpeaking?: boolean;
 }
 
+/**
+ * A blinking | cursor appended to the end of a streaming assistant message.
+ */
+const StreamingCursor: React.FC = () => {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0, duration: 530, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 530, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+
+  return <Animated.Text style={[styles.streamingCursor, { opacity }]}>|</Animated.Text>;
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak, isSpeaking }) => {
   const isUser = message.role === 'user';
+  const isStreaming = !isUser && !!message.isStreaming;
+
+  const displayContent = isUser
+    ? message.content
+    : message.content.replace(/\*[^*]+\*/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
   return (
     <View
@@ -49,32 +68,36 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak, isSp
             isUser ? styles.userText : styles.assistantText,
           ]}
         >
-          {message.content}
+          {displayContent}
+          {isStreaming && <StreamingCursor />}
         </Text>
-        <View style={styles.bubbleFooter}>
-          <Text
-            style={[
-              styles.timestamp,
-              isUser ? styles.userTimestamp : styles.assistantTimestamp,
-            ]}
-          >
-            {message.timestamp.toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
-          {!isUser && onSpeak && (
-            <TouchableOpacity
-              onPress={onSpeak}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={[styles.speakButton, isSpeaking && styles.speakButtonActive]}
+        {/* Footer (timestamp + speak button) only shown once streaming is complete */}
+        {!isStreaming && (
+          <View style={styles.bubbleFooter}>
+            <Text
+              style={[
+                styles.timestamp,
+                isUser ? styles.userTimestamp : styles.assistantTimestamp,
+              ]}
             >
-              <Text style={[styles.speakIcon, isSpeaking && styles.speakIconActive]}>
-                {isSpeaking ? '■' : '▷'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+              {message.timestamp.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+            {!isUser && onSpeak && (
+              <TouchableOpacity
+                onPress={onSpeak}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={[styles.speakButton, isSpeaking && styles.speakButtonActive]}
+              >
+                <Text style={[styles.speakIcon, isSpeaking && styles.speakIconActive]}>
+                  {isSpeaking ? '■' : '▷'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -130,6 +153,13 @@ const styles = StyleSheet.create({
   },
   assistantText: {
     color: '#2D2D2D',
+  },
+  streamingCursor: {
+    fontFamily: 'System',
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#9B8AB4',
+    fontWeight: '300',
   },
   bubbleFooter: {
     flexDirection: 'row',

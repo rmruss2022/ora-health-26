@@ -5,6 +5,67 @@ import { postgresService } from '../services/postgres.service';
 import { PERSONAS } from '../config/behaviors';
 
 class ChatController {
+  async streamMessage(req: AuthRequest, res: Response) {
+    const { content, behaviorId } = req.body;
+    const userId = req.userId || 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa';
+
+    if (!content || !behaviorId) {
+      res.status(400).json({ error: 'Content and behaviorId required' });
+      return;
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const sendChunk = (text: string) => {
+      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    };
+
+    const onDone = (_fullText: string) => {
+      res.write('data: [DONE]\n\n');
+      res.end();
+    };
+
+    const onError = (err: Error) => {
+      console.error('Chat stream error:', err);
+      try {
+        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } catch (_) {
+        // Response may already be closed
+      }
+    };
+
+    try {
+      const hasAnthropicKey =
+        !!process.env.ANTHROPIC_API_KEY &&
+        process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here';
+
+      if (hasAnthropicKey) {
+        await aiService.streamMessageWithAnthropic(
+          userId,
+          content,
+          behaviorId,
+          sendChunk,
+          onDone,
+          onError
+        );
+      } else {
+        // Non-Anthropic fallback: emit whole response as a single chunk
+        const response = await aiService.sendMessage(userId, content, behaviorId);
+        sendChunk(response.content);
+        onDone(response.content);
+      }
+    } catch (err: any) {
+      onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
   async sendMessage(req: AuthRequest, res: Response) {
     try {
       const { content, behaviorId } = req.body;

@@ -17,12 +17,21 @@ import {
  */
 export const useTTS = (personaId: string) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(elevenLabsService.isBlocked);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
+    const unsubBlocked = elevenLabsService.onBlockedChange((blocked) => {
+      if (mountedRef.current) setIsBlocked(blocked);
+    });
+    const unsubIdle = elevenLabsService.onIdle(() => {
+      if (mountedRef.current) setIsSpeaking(false);
+    });
     return () => {
       mountedRef.current = false;
+      unsubBlocked();
+      unsubIdle();
       elevenLabsService.stop().catch(() => {});
     };
   }, []);
@@ -46,5 +55,15 @@ export const useTTS = (personaId: string) => {
     if (mountedRef.current) setIsSpeaking(false);
   }, []);
 
-  return { speak, stop, isSpeaking };
+  const queueSpeak = useCallback(
+    (text: string) => {
+      if (!VOICE_AGENT_ENABLED) return;
+      const voiceId = PERSONA_VOICE_MAP[personaId] ?? PERSONA_VOICE_MAP['persona-ora'];
+      if (mountedRef.current) setIsSpeaking(true);
+      elevenLabsService.queueSpeak(text, voiceId);
+    },
+    [personaId]
+  );
+
+  return { speak, stop, isSpeaking, isBlocked, queueSpeak };
 };
