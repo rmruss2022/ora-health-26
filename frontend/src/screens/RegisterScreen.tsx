@@ -1,6 +1,5 @@
 /**
- * Register Screen
- * New user registration with email, password, and name
+ * Register Screen — Ora design system (lavender→blush gradient, plum buttons)
  */
 
 import React, { useState } from 'react';
@@ -15,7 +14,9 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../theme';
 
@@ -74,127 +75,153 @@ export function RegisterScreen({ navigation }: any) {
 
     try {
       await register(email, password, name);
-      // Navigation will be handled automatically by AuthContext
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Sign up to get started</Text>
+    <LinearGradient colors={['#D4B8E8', '#F8C8DC']} style={styles.gradient}>
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.content}>
+            <Image
+              source={require('../../assets/images/Ora-Logomark-Green.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Full Name</Text>
-              <TextInput
-                style={[styles.input, errors.name ? styles.inputError : null]}
-                value={name}
-                onChangeText={setName}
-                placeholder="John Doe"
-                autoCapitalize="words"
-                editable={!isLoading}
-              />
-              {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
-            </View>
+            <Text style={styles.title}>Begin your journey</Text>
+            <Text style={styles.subtitle}>Create your account to get started</Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={[styles.input, errors.email ? styles.inputError : null]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="your@email.com"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!isLoading}
-              />
-              {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
-            </View>
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                  style={[styles.input, errors.name ? styles.inputError : null]}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your name"
+                  placeholderTextColor="rgba(60,20,80,0.35)"
+                  autoCapitalize="words"
+                  editable={!isLoading}
+                />
+                {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
+              </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={[styles.input, errors.password ? styles.inputError : null]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                secureTextEntry
-                editable={!isLoading}
-              />
-              {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={[styles.input, errors.email ? styles.inputError : null]}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="your@email.com"
+                  placeholderTextColor="rgba(60,20,80,0.35)"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!isLoading}
+                />
+                {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+              </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <TextInput
-                style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="••••••••"
-                secureTextEntry
-                editable={!isLoading}
-              />
-              {errors.confirmPassword ? (
-                <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-              ) : null}
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={[styles.input, errors.password ? styles.inputError : null]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="rgba(60,20,80,0.35)"
+                  secureTextEntry
+                  editable={!isLoading}
+                />
+                {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+              </View>
 
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={theme.colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>Create Account</Text>
-              )}
-            </TouchableOpacity>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <TextInput
+                  style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="rgba(60,20,80,0.35)"
+                  secureTextEntry
+                  editable={!isLoading}
+                />
+                {errors.confirmPassword ? (
+                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                ) : null}
+              </View>
 
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text style={styles.linkText}>Sign In</Text>
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleRegister}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="rgba(255,255,255,0.95)" />
+                ) : (
+                  <Text style={styles.buttonText}>Create Account</Text>
+                )}
               </TouchableOpacity>
+
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>Already have an account? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                  <Text style={styles.linkText}>Sign In</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
     flex: 1,
-    backgroundColor: '#ECECEC',
+  },
+  kav: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
   content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 48,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    marginBottom: 28,
+    opacity: 0.9,
   },
   title: {
     fontFamily: theme.typography.h2.fontFamily,
-    fontSize: 36,
-    color: '#575545',
+    fontSize: 32,
+    color: 'rgba(60,20,80,0.9)',
     marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
     fontFamily: theme.typography.body.fontFamily,
     fontSize: 16,
-    color: '#868074',
+    color: 'rgba(60,20,80,0.6)',
     marginBottom: 40,
+    textAlign: 'center',
   },
   form: {
     width: '100%',
@@ -204,55 +231,56 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: theme.typography.label.fontFamily,
-    fontSize: 14,
-    color: '#666158',
+    fontSize: 13,
+    color: 'rgba(60,20,80,0.7)',
     marginBottom: 8,
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: '#D7D3C8',
+    borderColor: 'rgba(60,20,80,0.2)',
     borderRadius: 14,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#F8F6F0',
-    color: '#4D4A42',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    color: 'rgba(60,20,80,0.9)',
   },
   inputError: {
-    borderColor: '#EF4444',
+    borderColor: 'rgba(200,50,100,0.6)',
   },
   errorText: {
-    color: '#EF4444',
+    color: 'rgba(180,30,80,0.9)',
     fontSize: 12,
     marginTop: 4,
   },
   button: {
-    height: 50,
-    backgroundColor: '#5C6C57',
-    borderRadius: 14,
+    height: 52,
+    backgroundColor: 'rgba(60,20,80,0.75)',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 12,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   buttonText: {
-    color: '#F8F8F2',
+    color: 'rgba(255,255,255,0.95)',
     fontFamily: theme.typography.button.fontFamily,
-    fontSize: 15,
+    fontSize: 16,
+    letterSpacing: 0.3,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 28,
   },
   footerText: {
-    color: '#898478',
+    color: 'rgba(60,20,80,0.55)',
     fontSize: 14,
   },
   linkText: {
-    color: '#5C6C57',
+    color: 'rgba(60,20,80,0.85)',
     fontFamily: theme.typography.button.fontFamily,
     fontSize: 14,
   },

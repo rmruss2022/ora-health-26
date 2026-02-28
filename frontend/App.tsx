@@ -7,6 +7,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
 import { useFonts } from './src/hooks/useFonts';
 import { theme } from './src/theme';
+import { ElevenLabsAgentProvider } from './src/providers/ElevenLabsAgentProvider';
 
 export default function App() {
   const fontsLoaded = useFonts();
@@ -18,14 +19,16 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <OnboardingProvider>
-          <SafeAreaView style={styles.container}>
-            <AppNavigator />
-          </SafeAreaView>
-          <StatusBar style="auto" />
-        </OnboardingProvider>
-      </AuthProvider>
+      <ElevenLabsAgentProvider>
+        <AuthProvider>
+          <OnboardingProvider>
+            <SafeAreaView style={styles.container}>
+              <AppNavigator />
+            </SafeAreaView>
+            <StatusBar style="auto" />
+          </OnboardingProvider>
+        </AuthProvider>
+      </ElevenLabsAgentProvider>
     </SafeAreaProvider>
   );
 }

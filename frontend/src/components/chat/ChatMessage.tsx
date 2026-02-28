@@ -35,9 +35,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSpeak, isSp
   const isUser = message.role === 'user';
   const isStreaming = !isUser && !!message.isStreaming;
 
-  const displayContent = isUser
-    ? message.content
-    : message.content.replace(/\*[^*]+\*/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  // Keep the assistant text exactly as generated.
+  // We no longer strip *...* patterns from chat UI because that can remove valid content.
+  const displayContent = message.content;
 
   return (
     <View

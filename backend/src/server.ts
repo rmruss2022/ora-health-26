@@ -17,6 +17,7 @@ import reflectionRoutes from './routes/reflection.routes';
 import roomRoutes from './routes/room.routes';
 import oraAgentRoutes from './routes/ora-agent.routes';
 import onboardingRoutes from './routes/onboarding.routes';
+import voiceRoutes from './routes/voice.routes';
 // Temporarily disabled due to TS errors - fix later
 // import agentRoutes from './routes/agent.routes';
 // import quizRoutes from './routes/quiz.routes';
@@ -96,6 +97,7 @@ app.use('/api/reflections', reflectionRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/ora-agent', oraAgentRoutes);
 app.use('/api/users', onboardingRoutes);
+app.use('/api/voice', voiceRoutes);
 // Temporarily disabled - fix TS errors later
 // app.use('/api/agents', agentRoutes);
 // app.use('/api/quiz', quizRoutes);

@@ -1,0 +1,203 @@
+import { useCallback, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import { useConversation } from '@elevenlabs/react-native';
+import { voiceAgentAPI } from '../services/api/voiceAgentAPI';
+
+export type VoiceState = 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
+
+interface VoiceMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface UseElevenVoiceAgentOptions {
+  userId?: string;
+  agentId?: string;
+}
+
+const DEFAULT_AGENT_ID = (process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID as string | undefined)?.trim();
+
+function mapStatusToVoiceState(status?: string): VoiceState {
+  if (status === 'connecting') return 'thinking';
+  if (status === 'connected') return 'listening';
+  return 'idle';
+}
+
+function mapModeToVoiceState(mode?: string): VoiceState {
+  if (mode === 'speaking') return 'speaking';
+  if (mode === 'listening') return 'listening';
+  return 'thinking';
+}
+
+function extractText(message: any): string {
+  if (typeof message?.text === 'string') return message.text;
+  if (typeof message?.content === 'string') return message.content;
+  if (typeof message?.message === 'string') return message.message;
+  if (typeof message?.transcript === 'string') return message.transcript;
+  return '';
+}
+
+function extractRole(message: any): 'user' | 'assistant' {
+  const value = String(message?.role || message?.source || '').toLowerCase();
+  if (value.includes('user') || value.includes('human')) return 'user';
+  return 'assistant';
+}
+
+function safeStringify(value: unknown, maxChars = 2400): string {
+  try {
+    const text = JSON.stringify(value);
+    return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+  } catch {
+    return String(value);
+  }
+}
+
+async function maybeResolveClientTool(params: any, payload: any): Promise<void> {
+  const candidates = ['respond', 'resolve', 'sendResult', 'onResult'];
+  for (const key of candidates) {
+    const fn = params?.[key];
+    if (typeof fn === 'function') {
+      await fn(payload);
+      return;
+    }
+  }
+}
+
+export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOptions) {
+  const [messages, setMessages] = useState<VoiceMessage[]>([]);
+  const [active, setActive] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [micMuted, setMicMuted] = useState(false);
+
+  const resolvedAgentId = agentId || DEFAULT_AGENT_ID || '';
+  const available = Platform.OS !== 'web';
+
+  const conversation = useConversation({
+    onConnect: () => {
+      setActive(true);
+      setVoiceState('listening');
+      setError(null);
+    },
+    onDisconnect: () => {
+      setActive(false);
+      setVoiceState('idle');
+      setMicMuted(false);
+    },
+    onError: (err: any) => {
+      console.error('[useElevenVoiceAgent] conversation error:', err);
+      setError(err?.message || 'Voice session failed');
+      setVoiceState('idle');
+      setActive(false);
+    },
+    onStatusChange: (prop: any) => {
+      setVoiceState(mapStatusToVoiceState(prop?.status));
+    },
+    onModeChange: (mode: any) => {
+      setVoiceState(mapModeToVoiceState(typeof mode === 'string' ? mode : mode?.mode));
+    },
+    onMessage: (msg: any) => {
+      const text = extractText(msg).trim();
+      if (!text) return;
+      const role = extractRole(msg);
+      const id = String(
+        msg?.id
+          || msg?.messageId
+          || `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      );
+      setMessages((prev) => [...prev, { id, role, content: text }]);
+    },
+    onUnhandledClientToolCall: async (params: any) => {
+      const toolName = String(
+        params?.toolName
+          || params?.name
+          || params?.tool_name
+          || ''
+      ).trim();
+      const args =
+        params?.arguments
+        || params?.args
+        || params?.input
+        || params?.parameters
+        || {};
+
+      if (!toolName) {
+        console.warn('[useElevenVoiceAgent] Tool call missing name:', params);
+        return;
+      }
+
+      try {
+        const response = await voiceAgentAPI.executeToolCall(toolName, args);
+        await maybeResolveClientTool(params, response.result);
+        console.log('[useElevenVoiceAgent] Tool result:', toolName, safeStringify(response.result));
+      } catch (err: any) {
+        const message = err?.message || `Tool "${toolName}" failed`;
+        await maybeResolveClientTool(params, { error: message });
+        console.warn('[useElevenVoiceAgent] Tool failed:', toolName, message);
+      }
+    },
+  });
+
+  const enterVoiceMode = useCallback(async () => {
+    if (!available) return;
+    setError(null);
+    setMessages([]);
+    setVoiceState('thinking');
+    try {
+      const tokenPayload = await voiceAgentAPI.getConversationToken(resolvedAgentId || undefined);
+      await conversation.startSession({
+        conversationToken: tokenPayload.token,
+        userId,
+      });
+    } catch (err: any) {
+      console.error('[useElevenVoiceAgent] startSession error:', err);
+      setError(err?.message || 'Could not start voice session');
+      setVoiceState('idle');
+      setActive(false);
+    }
+  }, [available, resolvedAgentId, conversation, userId]);
+
+  const exitVoiceMode = useCallback(async () => {
+    try {
+      await conversation.endSession();
+    } catch (err) {
+      console.warn('[useElevenVoiceAgent] endSession warning:', err);
+    } finally {
+      setActive(false);
+      setVoiceState('idle');
+      setMicMuted(false);
+    }
+  }, [conversation]);
+
+  const handleOrbPress = useCallback(async () => {
+    try {
+      if (voiceState === 'speaking') {
+        await conversation.sendUserActivity();
+        return;
+      }
+      const nextMuted = !micMuted;
+      conversation.setMicMuted(nextMuted);
+      setMicMuted(nextMuted);
+      setVoiceState(nextMuted ? 'idle' : 'listening');
+    } catch (err) {
+      console.warn('[useElevenVoiceAgent] orb press warning:', err);
+    }
+  }, [conversation, micMuted, voiceState]);
+
+  const result = useMemo(
+    () => ({
+      available,
+      active,
+      voiceState,
+      messages,
+      error,
+      enterVoiceMode,
+      exitVoiceMode,
+      handleOrbPress,
+    }),
+    [available, active, voiceState, messages, error, enterVoiceMode, exitVoiceMode, handleOrbPress]
+  );
+
+  return result;
+}

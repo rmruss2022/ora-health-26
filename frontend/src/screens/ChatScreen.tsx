@@ -20,8 +20,10 @@ import { useTTS } from '../hooks/useTTS';
 import { usePTT } from '../hooks/usePTT';
 import { useVoiceConversation } from '../hooks/useVoiceConversation';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
+import { useElevenVoiceAgent } from '../hooks/useElevenVoiceAgent';
 import { VoiceConversationModal } from '../components/voice/VoiceConversationModal';
 import { theme } from '../theme';
+import { useAuth } from '../context/AuthContext';
 
 type PersonaId = 'persona-ora' | 'persona-genz' | 'persona-psychotherapist';
 
@@ -42,6 +44,7 @@ const MODES = [
 export const ChatScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
+  const { user } = useAuth();
 
   const modeFromRoute: string | undefined = route?.params?.conversationMode;
   const [selectedMode, setSelectedMode] = useState(modeFromRoute || 'free-form');
@@ -153,6 +156,15 @@ export const ChatScreen: React.FC = () => {
     handleOrbPress,
   } = useVoiceConversation({ sendMessage, messages, personaId: selectedPersona, isLoading });
 
+  const elevenVoice = useElevenVoiceAgent({ userId: user?.id });
+  const useElevenAgentVoice = VOICE_AGENT_ENABLED && elevenVoice.available;
+  const currentVoiceState = useElevenAgentVoice ? elevenVoice.voiceState : voiceState;
+  const currentVoiceActive = useElevenAgentVoice ? elevenVoice.active : voiceConvActive;
+  const currentVoiceMessages = useElevenAgentVoice ? elevenVoice.messages : messages;
+  const onEnterVoiceMode = useElevenAgentVoice ? elevenVoice.enterVoiceMode : enterVoiceMode;
+  const onExitVoiceMode = useElevenAgentVoice ? elevenVoice.exitVoiceMode : exitVoiceMode;
+  const onOrbPress = useElevenAgentVoice ? elevenVoice.handleOrbPress : handleOrbPress;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -162,11 +174,11 @@ export const ChatScreen: React.FC = () => {
       {/* Voice Conversation Modal */}
       {VOICE_AGENT_ENABLED && (
         <VoiceConversationModal
-          visible={voiceConvActive}
-          voiceState={voiceState}
-          messages={messages}
-          onOrbPress={handleOrbPress}
-          onExit={exitVoiceMode}
+          visible={currentVoiceActive}
+          voiceState={currentVoiceState}
+          messages={currentVoiceMessages}
+          onOrbPress={onOrbPress}
+          onExit={onExitVoiceMode}
         />
       )}
 
@@ -186,7 +198,7 @@ export const ChatScreen: React.FC = () => {
           {VOICE_AGENT_ENABLED && (
             <TouchableOpacity
               style={styles.voiceModeButton}
-              onPress={enterVoiceMode}
+              onPress={onEnterVoiceMode}
               activeOpacity={0.75}
               accessibilityLabel="Enter voice conversation mode"
             >
