@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
+import { OnboardingNavigator } from './OnboardingNavigator';
 import { ChatScreen } from '../screens/ChatScreen';
 import { MeditationTimerScreen } from '../screens/MeditationTimerScreen';
 import { RoomScreen } from '../screens/RoomScreen';
@@ -146,15 +148,47 @@ function LoadingScreen() {
   );
 }
 
+const DEV_MOCK_USER_ID = 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa';
+const FORCE_ONBOARDING = process.env.EXPO_PUBLIC_FORCE_ONBOARDING === 'true';
+
 /**
- * Root navigator - switches between auth and main app based on auth state
+ * Root navigator - switches between auth, onboarding, and main app based on state.
+ * Dev mock user always bypasses onboarding so existing dev work is unaffected,
+ * unless EXPO_PUBLIC_FORCE_ONBOARDING=true is set in .env.
  */
 export function AppNavigator() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const { hasCompletedOnboarding, isSubscribed, loadOnboardingState } = useOnboarding();
+  const [onboardingLoaded, setOnboardingLoaded] = useState(false);
+
+  const isDevMockUser = !FORCE_ONBOARDING && user?.id === DEV_MOCK_USER_ID;
+
+  useEffect(() => {
+    if (!user) {
+      setOnboardingLoaded(false);
+      return;
+    }
+    if (isDevMockUser) {
+      setOnboardingLoaded(true);
+      return;
+    }
+    loadOnboardingState().finally(() => setOnboardingLoaded(true));
+  }, [user?.id]);
+
+  const isLoading = authLoading || (!!user && !isDevMockUser && !onboardingLoaded);
+  const onboardingComplete = isDevMockUser || (hasCompletedOnboarding && isSubscribed);
 
   return (
     <NavigationContainer>
-      {isLoading ? <LoadingScreen /> : isAuthenticated ? <MainTabs /> : <AuthNavigator />}
+      {isLoading ? (
+        <LoadingScreen />
+      ) : !user ? (
+        <AuthNavigator />
+      ) : !onboardingComplete ? (
+        <OnboardingNavigator />
+      ) : (
+        <MainTabs />
+      )}
     </NavigationContainer>
   );
 }

@@ -14,6 +14,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTTS } from '../hooks/useTTS';
 import { useAgentContext } from '../hooks/useAgentContext';
 import { VOICE_AGENT_ENABLED } from '../services/ElevenLabsService';
+import { backgroundMusicService } from '../services/BackgroundMusicService';
+import { MeditationSoundControl } from './MeditationSoundControl';
 import { theme } from '../theme';
 
 type AuraContext = 'home' | 'community';
@@ -67,6 +69,15 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
 
   const fallbackMessage = getContextualMessage(context);
   const { speak, stop, isSpeaking, isBlocked } = useTTS('aura');
+
+  // Duck background music while TTS is speaking
+  useEffect(() => {
+    if (isSpeaking) {
+      backgroundMusicService.duckForTTS();
+    } else {
+      backgroundMusicService.restoreFromDuck();
+    }
+  }, [isSpeaking]);
   const { message: dynamicMessage, loading: messageLoading } = useAgentContext(context);
 
   // Always use the most current message when TTS fires
@@ -284,6 +295,8 @@ export const FloatingAuraAgent: React.FC<FloatingAuraAgentProps> = ({
               </Text>
             </TouchableOpacity>
           )}
+          <View style={styles.soundDivider} />
+          <MeditationSoundControl style={{ marginTop: 10 }} />
         </View>
         <View style={styles.tail} />
       </Animated.View>
@@ -395,6 +408,11 @@ const styles = StyleSheet.create({
   },
   listenLabelActive: {
     color: '#7B5EA7',
+  },
+  soundDivider: {
+    height: 1,
+    backgroundColor: 'rgba(212,184,232,0.2)',
+    marginTop: 10,
   },
   tail: {
     width: 12,

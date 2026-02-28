@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +13,8 @@ import { MeditationList, Meditation } from '../components/MeditationList';
 import { MeditationFilterModal, MeditationFilters } from '../components/MeditationFilterModal';
 import { RoomPreviewSheet } from '../components/RoomPreviewSheet';
 import { FloatingAuraAgent } from '../components/FloatingAuraAgent';
+import { AuraIntroOverlay } from '../components/AuraIntroOverlay';
+import { backgroundMusicService } from '../services/BackgroundMusicService';
 import { roomsAPI, MeditationRoom } from '../services/api/roomsAPI';
 import { theme } from '../theme';
 
@@ -91,6 +92,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [introVisible, setIntroVisible] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filters, setFilters] = useState<MeditationFilters>({});
   const [previewRoom, setPreviewRoom] = useState<Room | null>(null);
@@ -155,6 +157,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     loadRooms();
+    backgroundMusicService.play('cascade');
   }, []);
 
   const mapRoomWithImage = (room: Omit<Room, 'image'>): Room => ({
@@ -228,14 +231,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleApplyFilters = (newFilters: MeditationFilters) => {
     setFilters(newFilters);
   };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
-  }
 
   const recommendedRoom = getRecommendedRoom();
   const hasSoloRoom = rooms.some((room) => room.theme === 'solo');
@@ -386,7 +381,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      <FloatingAuraAgent context="home" />
+      {!introVisible && <FloatingAuraAgent context="home" />}
+      <AuraIntroOverlay
+        visible={introVisible}
+        canDismiss={!loading}
+        onDismiss={() => setIntroVisible(false)}
+      />
 
       <RoomPreviewSheet
         room={previewRoom}
@@ -408,10 +408,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundLight,
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   scrollContent: {
     paddingHorizontal: 20,

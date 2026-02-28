@@ -32,22 +32,24 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Hardcoded dev mock user — used as fallback when backend is unreachable in dev
+const DEV_MOCK_USER: AuthUser = {
+  id: 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa',
+  email: 'test@ora.ai',
+  name: 'Matthew',
+  created_at: new Date().toISOString(),
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // BYPASS AUTH: Always use mock user for testing
-  const [user, setUser] = useState<AuthUser | null>({
-    id: 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa',
-    email: 'test@ora.ai',
-    name: 'Matthew',
-    created_at: new Date().toISOString(),
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   /**
    * Initialize auth state on app launch
-   * DISABLED FOR TESTING - Auth bypassed
+   * Falls back to dev mock user if backend is unreachable in development
    */
   useEffect(() => {
-    // initializeAuth(); // DISABLED - using mock user
+    initializeAuth();
   }, []);
 
   /**
@@ -66,27 +68,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Initialize authentication on app start
-   * Checks for stored tokens and validates session
+   * Initialize authentication on app start.
+   * Falls back to DEV_MOCK_USER when the backend is unreachable in development.
    */
   async function initializeAuth() {
     try {
       setIsLoading(true);
 
-      // Check if we have stored tokens
       const hasSession = await secureStorage.hasValidSession();
       if (!hasSession) {
         setUser(null);
         return;
       }
 
-      // Try to get user profile with stored token
-      // This will automatically refresh if needed via interceptor
       const response = await authApi.getProfile();
       setUser(response.user);
     } catch (error) {
-      console.error('Auth initialization failed:', error);
-      // Clear invalid session
+      const isNetworkError =
+        (error as any)?.message?.includes('Network request failed') ||
+        (error as any)?.code === 'ECONNREFUSED';
+
+      if (__DEV__ && isNetworkError) {
+        console.warn('[AuthContext] Backend unreachable — using dev mock user');
+        setUser(DEV_MOCK_USER);
+        return;
+      }
+
       await secureStorage.clearAll();
       setUser(null);
     } finally {

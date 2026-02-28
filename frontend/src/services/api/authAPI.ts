@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { AuthUser } from '../../context/AuthContext';
 
 export interface AuthResponse {
   token: string;
@@ -6,16 +7,55 @@ export interface AuthResponse {
   email: string;
 }
 
+export interface AuthLoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser;
+}
+
+export interface AuthProfileResponse {
+  user: AuthUser;
+}
+
 export class AuthAPI {
+  // ===== Methods used by AuthContext =====
+
+  async getProfile(): Promise<AuthProfileResponse> {
+    return apiClient.get<AuthProfileResponse>('/auth/me');
+  }
+
+  async login(params: {
+    email: string;
+    password: string;
+  }): Promise<AuthLoginResponse> {
+    const response = await apiClient.post<AuthLoginResponse>('/auth/login', params);
+    apiClient.setAuthToken(response.accessToken);
+    return response;
+  }
+
+  async register(params: {
+    email: string;
+    password: string;
+    name: string;
+  }): Promise<AuthLoginResponse> {
+    const response = await apiClient.post<AuthLoginResponse>('/auth/register', params);
+    apiClient.setAuthToken(response.accessToken);
+    return response;
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await apiClient.post('/auth/logout', { refreshToken });
+    apiClient.clearAuthToken();
+  }
+
+  // ===== Legacy / SignIn aliases =====
+
   async signUp(email: string, password: string): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/auth/signup', {
       email,
       password,
     });
-
-    // Store token in API client
     apiClient.setAuthToken(response.token);
-
     return response;
   }
 
@@ -24,10 +64,7 @@ export class AuthAPI {
       email,
       password,
     });
-
-    // Store token in API client
     apiClient.setAuthToken(response.token);
-
     return response;
   }
 
@@ -50,3 +87,6 @@ export class AuthAPI {
 }
 
 export const authAPI = new AuthAPI();
+
+// Alias used by AuthContext (which imports { authApi })
+export const authApi = authAPI;

@@ -4,6 +4,7 @@ import { StyleSheet, SafeAreaView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/context/AuthContext';
+import { OnboardingProvider } from './src/context/OnboardingContext';
 import { useFonts } from './src/hooks/useFonts';
 import { theme } from './src/theme';
 
@@ -18,10 +19,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <SafeAreaView style={styles.container}>
-          <AppNavigator />
-        </SafeAreaView>
-        <StatusBar style="auto" />
+        <OnboardingProvider>
+          <SafeAreaView style={styles.container}>
+            <AppNavigator />
+          </SafeAreaView>
+          <StatusBar style="auto" />
+        </OnboardingProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

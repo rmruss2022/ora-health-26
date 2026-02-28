@@ -24,6 +24,7 @@ const personaWelcomeMessages: Record<string, string> = {
   'persona-ora': "Hey. I'm Ora \u2014 your space to breathe, reflect, and find your way. What's on your mind today?",
   'persona-genz': "heyyy bestie \ud83d\udc4b i'm Sage. no judgment zone, only vibes here. what's going on fr?",
   'persona-psychotherapist': "Hello, I'm Dr. Avery. I'm glad you're here. Take whatever time you need \u2014 I'm curious to understand what brings you in today.",
+  'onboarding-intake': "Hello. I'm Ora. Before we begin, I'd love to learn a little about you \u2014 it helps me show up for you in the right way. There's no rush here.",
 };
 
 /**
@@ -76,8 +77,10 @@ export const useChat = (
       cancelStreamRef.current = null;
     }
 
-    // Set initial welcome message based on persona (if set) or behavior
-    const content = personaWelcomeMessages[personaId]
+    // Set initial welcome message. Non-persona behaviorIds (e.g. onboarding-intake)
+    // take priority; otherwise fall back to persona, then behavior, then default.
+    const content = personaWelcomeMessages[behaviorId]
+      || personaWelcomeMessages[personaId]
       || welcomeMessages[behaviorId]
       || welcomeMessages['free-form-chat'];
 
@@ -126,8 +129,12 @@ export const useChat = (
 
       let speechBuffer = '';
 
+      // Use behaviorId for the API call when it's a non-persona behavior (e.g. onboarding-intake).
+      // Persona-based behaviors (starting with 'persona-') always use the personaId directly.
+      const effectiveBehaviorId = behaviorId.startsWith('persona-') ? personaId : behaviorId;
+
       const cancel = chatAPI.streamMessage(
-        { content: text, behaviorId: personaId },
+        { content: text, behaviorId: effectiveBehaviorId },
 
         // onChunk — append delta text; flip isLoading off on the first chunk
         (chunk: string) => {

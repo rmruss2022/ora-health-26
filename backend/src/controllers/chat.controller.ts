@@ -46,7 +46,7 @@ class ChatController {
         !!process.env.ANTHROPIC_API_KEY &&
         process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here';
 
-      if (hasAnthropicKey) {
+      if (hasAnthropicKey && process.env.AI_PROVIDER !== 'nvidia') {
         await aiService.streamMessageWithAnthropic(
           userId,
           content,
