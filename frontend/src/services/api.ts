@@ -43,7 +43,7 @@ export const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     // Skip auth for public endpoints
-    const publicEndpoints = ['/auth/register', '/auth/login', '/auth/refresh'];
+    const publicEndpoints = ['/auth/register', '/auth/signup', '/auth/login', '/auth/refresh'];
     const isPublicEndpoint = publicEndpoints.some((endpoint) =>
       config.url?.includes(endpoint)
     );

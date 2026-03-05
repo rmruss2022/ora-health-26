@@ -1,7 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useConversation } from '@elevenlabs/react-native';
+import { Audio } from 'expo-av';
 import { voiceAgentAPI } from '../services/api/voiceAgentAPI';
+import { API_CONFIG } from '../config/api';
 
 export type VoiceState = 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
@@ -70,6 +72,7 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [micMuted, setMicMuted] = useState(false);
+  const isStartingRef = useRef(false);
 
   const resolvedAgentId = agentId || DEFAULT_AGENT_ID || '';
   const available = Platform.OS !== 'web';
@@ -79,6 +82,9 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       setActive(true);
       setVoiceState('listening');
       setError(null);
+      // Ensure mic starts unmuted whenever a new session connects.
+      conversation.setMicMuted(false);
+      setMicMuted(false);
     },
     onDisconnect: () => {
       setActive(false);
@@ -92,9 +98,11 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       setActive(false);
     },
     onStatusChange: (prop: any) => {
+      console.log('[useElevenVoiceAgent] status:', prop?.status);
       setVoiceState(mapStatusToVoiceState(prop?.status));
     },
     onModeChange: (mode: any) => {
+      console.log('[useElevenVoiceAgent] mode:', typeof mode === 'string' ? mode : mode?.mode);
       setVoiceState(mapModeToVoiceState(typeof mode === 'string' ? mode : mode?.mode));
     },
     onMessage: (msg: any) => {
@@ -127,24 +135,53 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
         return;
       }
 
+      const apiUrl = `${API_CONFIG.api.baseURL}/api/voice/tool-call`;
+      console.log('[useElevenVoiceAgent] Tool call:', toolName, '->', apiUrl);
+
       try {
         const response = await voiceAgentAPI.executeToolCall(toolName, args);
         await maybeResolveClientTool(params, response.result);
         console.log('[useElevenVoiceAgent] Tool result:', toolName, safeStringify(response.result));
       } catch (err: any) {
         const message = err?.message || `Tool "${toolName}" failed`;
+        const statusCode = err?.statusCode ?? err?.status;
+        console.warn(
+          '[useElevenVoiceAgent] Tool failed:',
+          toolName,
+          message,
+          statusCode ? `(HTTP ${statusCode})` : '',
+          'URL:',
+          apiUrl
+        );
         await maybeResolveClientTool(params, { error: message });
-        console.warn('[useElevenVoiceAgent] Tool failed:', toolName, message);
       }
     },
   });
 
   const enterVoiceMode = useCallback(async () => {
     if (!available) return;
+    // Prevent duplicate taps from starting overlapping sessions.
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     setError(null);
     setMessages([]);
     setVoiceState('thinking');
     try {
+      // Request mic permission — LiveKit/WebRTC manages the audio session itself.
+      const micPermission = await Audio.requestPermissionsAsync();
+      if (!micPermission.granted) {
+        setError('Microphone permission is required for voice mode');
+        setVoiceState('idle');
+        setActive(false);
+        return;
+      }
+
+      // Defensive cleanup: ensure any stale session is closed before starting a new one.
+      try {
+        await conversation.endSession();
+      } catch {
+        // Ignore if no active session exists.
+      }
       const tokenPayload = await voiceAgentAPI.getConversationToken(resolvedAgentId || undefined);
       await conversation.startSession({
         conversationToken: tokenPayload.token,
@@ -155,6 +192,8 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       setError(err?.message || 'Could not start voice session');
       setVoiceState('idle');
       setActive(false);
+    } finally {
+      isStartingRef.current = false;
     }
   }, [available, resolvedAgentId, conversation, userId]);
 
@@ -176,14 +215,14 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
         await conversation.sendUserActivity();
         return;
       }
-      const nextMuted = !micMuted;
-      conversation.setMicMuted(nextMuted);
-      setMicMuted(nextMuted);
-      setVoiceState(nextMuted ? 'idle' : 'listening');
+      // Keep mic open in live voice mode; accidental taps shouldn't mute.
+      conversation.setMicMuted(false);
+      setMicMuted(false);
+      setVoiceState('listening');
     } catch (err) {
       console.warn('[useElevenVoiceAgent] orb press warning:', err);
     }
-  }, [conversation, micMuted, voiceState]);
+  }, [conversation, voiceState]);
 
   const result = useMemo(
     () => ({

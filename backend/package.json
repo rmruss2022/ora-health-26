@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate:vector": "npx ts-node run-vector-migration.ts",
-    "test:vector": "npx ts-node test-vector-system.ts"
+    "test:vector": "npx ts-node test-vector-system.ts",
+    "update-elevenlabs-agent": "ts-node ../scripts/update-elevenlabs-agent.ts"
   },
   "keywords": [],
   "author": "",

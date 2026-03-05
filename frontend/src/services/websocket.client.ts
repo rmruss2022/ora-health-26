@@ -3,6 +3,8 @@
  * Manages real-time connections for room updates, notifications, etc.
  */
 
+import { getWebSocketURL } from '../config/api';
+
 type MessageHandler = (data: any) => void;
 
 interface SubscriptionHandlers {
@@ -20,7 +22,7 @@ class WebSocketClient {
   private isConnecting = false;
   private isIntentionalClose = false;
 
-  constructor(url: string = 'ws://localhost:4000') {
+  constructor(url: string = getWebSocketURL()) {
     this.url = url;
   }
 

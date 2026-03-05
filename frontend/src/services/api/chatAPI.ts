@@ -59,8 +59,25 @@ export class ChatAPI {
 
       const reader = response.body?.getReader();
       if (!reader) {
-        onError(new Error('No readable stream in response'));
-        return;
+        // Some React Native runtimes (notably iOS native/dev builds) may not expose
+        // a ReadableStream reader on fetch responses. Fall back to non-stream mode.
+        try {
+          const fallback = await this.sendMessage(message);
+          if (typeof fallback?.content === 'string') {
+            onChunk(fallback.content);
+            onDone();
+            return;
+          }
+          onError(new Error('No readable stream and no fallback content'));
+          return;
+        } catch (fallbackErr: any) {
+          onError(
+            fallbackErr instanceof Error
+              ? fallbackErr
+              : new Error('No readable stream in response')
+          );
+          return;
+        }
       }
 
       const decoder = new TextDecoder();

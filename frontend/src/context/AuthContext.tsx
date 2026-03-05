@@ -56,7 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Listen for logout events from API interceptor
    */
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (
+      typeof window === 'undefined'
+      || typeof (window as any).addEventListener !== 'function'
+      || typeof (window as any).removeEventListener !== 'function'
+    ) {
+      return;
+    }
 
     const handleLogout = () => {
       setUser(null);
@@ -124,9 +130,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user);
     } catch (error: any) {
       console.error('Registration failed:', error);
-      throw new Error(
-        error.response?.data?.message || 'Registration failed. Please try again.'
-      );
+      const status = error.response?.status;
+      const msg = error.response?.data?.message || error.response?.data?.error;
+      if (status === 401) {
+        // 401 on register usually means CORS or wrong endpoint - suggest checking connection
+        throw new Error(
+          msg || 'Connection issue. Ensure your phone and computer are on the same Wi‑Fi and the backend is running.'
+        );
+      }
+      throw new Error(msg || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

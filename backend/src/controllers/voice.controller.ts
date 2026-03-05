@@ -1,15 +1,32 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { profileService } from '../services/profile.service';
+import { aiToolsService } from '../services/ai-tools.service';
 
 interface ConversationTokenResponse {
   token: string;
 }
 
+// All tools available to the voice agent — matches chat tab's ai-tools
 type AllowedToolName =
   | 'get_user_profile'
   | 'update_user_profile'
-  | 'get_user_recommendations';
+  | 'get_user_recommendations'
+  | 'get_user_summaries'
+  | 'get_recent_journal_entries'
+  | 'search_journal_entries'
+  | 'get_conversation_history'
+  | 'save_user_insight'
+  | 'get_available_activities'
+  | 'search_activities'
+  | 'get_user_progress'
+  | 'get_user_letters'
+  | 'get_meditation_sessions'
+  | 'get_inbox_messages'
+  | 'save_weekly_plan'
+  | 'get_weekly_plan'
+  | 'save_weekly_review'
+  | 'get_weekly_review';
 
 class VoiceController {
   /**
@@ -81,20 +98,38 @@ class VoiceController {
    */
   async executeToolCall(req: AuthRequest, res: Response) {
     const userId = req.userId;
+    const toolName = String(req.body?.toolName || '').trim() as AllowedToolName;
+    const args = req.body?.args ?? {};
+
+    console.log('[VoiceController] executeToolCall', { toolName, userId: userId ?? 'none', argsKeys: Object.keys(args ?? {}) });
+
     if (!userId) {
+      console.warn('[VoiceController] executeToolCall rejected: no userId (auth required)');
       return res.status(401).json({
         error: 'Authentication required',
         message: 'No authenticated user found',
       });
     }
 
-    const toolName = String(req.body?.toolName || '').trim() as AllowedToolName;
-    const args = req.body?.args ?? {};
-
     const allowedTools: AllowedToolName[] = [
       'get_user_profile',
       'update_user_profile',
       'get_user_recommendations',
+      'get_user_summaries',
+      'get_recent_journal_entries',
+      'search_journal_entries',
+      'get_conversation_history',
+      'save_user_insight',
+      'get_available_activities',
+      'search_activities',
+      'get_user_progress',
+      'get_user_letters',
+      'get_meditation_sessions',
+      'get_inbox_messages',
+      'save_weekly_plan',
+      'get_weekly_plan',
+      'save_weekly_review',
+      'get_weekly_review',
     ];
 
     if (!allowedTools.includes(toolName)) {
@@ -105,6 +140,7 @@ class VoiceController {
     }
 
     try {
+      // Profile tools (existing)
       switch (toolName) {
         case 'get_user_profile': {
           const profile = await profileService.getUserProfile(userId);
@@ -139,8 +175,13 @@ class VoiceController {
           return res.json({ success: true, toolName, result: updated });
         }
       }
+
+      // Chat agent tools (same as chat tab)
+      const aiToolResult = await aiToolsService.executeTool(toolName, args, userId);
+      console.log('[VoiceController] executeToolCall success:', toolName);
+      return res.json({ success: true, toolName, result: aiToolResult });
     } catch (error: any) {
-      console.error('[VoiceController] executeToolCall error:', error);
+      console.error('[VoiceController] executeToolCall error:', toolName, error?.message, error);
       return res.status(500).json({
         error: 'Tool execution failed',
         message: error?.message || 'Unknown error',

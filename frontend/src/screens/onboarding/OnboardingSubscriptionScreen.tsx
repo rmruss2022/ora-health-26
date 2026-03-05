@@ -17,6 +17,7 @@ import {
   Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { subscriptionService } from '../../services/SubscriptionService';
 import { useTTS } from '../../hooks/useTTS';
@@ -35,8 +36,16 @@ const CARDS = [
 ];
 
 export function OnboardingSubscriptionScreen() {
+  const { user } = useAuth();
   const { grantSubscription } = useOnboarding();
   const [isLoading, setIsLoading] = useState(false);
+
+  // Configure RevenueCat before any purchase/restore (required by SDK)
+  useEffect(() => {
+    if (user?.id && Platform.OS !== 'web') {
+      subscriptionService.configure(user.id);
+    }
+  }, [user?.id]);
 
   const { speak, stop, isSpeaking } = useTTS('persona-ora');
 
@@ -126,6 +135,9 @@ export function OnboardingSubscriptionScreen() {
         await grantSubscription();
         return;
       }
+      // Ensure RevenueCat is configured before purchase (required by SDK)
+      const userId = user?.id ?? 'anonymous';
+      await subscriptionService.configure(userId);
       const success = await subscriptionService.purchaseMonthly();
       if (success) await grantSubscription();
     } catch (error: any) {

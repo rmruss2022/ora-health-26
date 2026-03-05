@@ -45,6 +45,12 @@ class ElevenLabsService {
   private drainGeneration = 0;
   private idleListeners: (() => void)[] = [];
 
+  private canUseDocumentListeners(): boolean {
+    return typeof document !== 'undefined'
+      && typeof document.addEventListener === 'function'
+      && typeof document.removeEventListener === 'function';
+  }
+
   private setBlocked(blocked: boolean) {
     this._isBlocked = blocked;
     this.blockedListeners.forEach((l) => l(blocked));
@@ -229,8 +235,10 @@ class ElevenLabsService {
           const unlock = () => {
             if (fired) return;
             fired = true;
-            document.removeEventListener('click', unlock);
-            document.removeEventListener('touchstart', unlock);
+            if (this.canUseDocumentListeners()) {
+              document.removeEventListener('click', unlock);
+              document.removeEventListener('touchstart', unlock);
+            }
             this.pendingUnlock = null;
             this.setBlocked(false);
             if (this.currentWebAudio === audio) {
@@ -240,8 +248,10 @@ class ElevenLabsService {
             }
           };
           this.pendingUnlock = unlock;
-          document.addEventListener('click', unlock, { once: true });
-          document.addEventListener('touchstart', unlock, { once: true });
+          if (this.canUseDocumentListeners()) {
+            document.addEventListener('click', unlock, { once: true });
+            document.addEventListener('touchstart', unlock, { once: true });
+          }
         } else {
           cleanup('play-rejected-' + err?.name);
         }
@@ -303,8 +313,10 @@ class ElevenLabsService {
                 clearTimeout(this.pendingUnlockTimer);
                 this.pendingUnlockTimer = null;
               }
-              document.removeEventListener('click', unlock);
-              document.removeEventListener('touchstart', unlock);
+              if (this.canUseDocumentListeners()) {
+                document.removeEventListener('click', unlock);
+                document.removeEventListener('touchstart', unlock);
+              }
               this.pendingUnlock = null;
               this.setBlocked(false);
               console.log('[ElevenLabsService] unlock — retrying audio.play()');
@@ -323,8 +335,10 @@ class ElevenLabsService {
               }
             };
             this.pendingUnlock = unlock;
-            document.addEventListener('click', unlock, { once: true });
-            document.addEventListener('touchstart', unlock, { once: true });
+            if (this.canUseDocumentListeners()) {
+              document.addEventListener('click', unlock, { once: true });
+              document.addEventListener('touchstart', unlock, { once: true });
+            }
           } else {
             cleanup('play-rejected-' + (err?.name ?? 'unknown'));
           }
@@ -361,7 +375,7 @@ class ElevenLabsService {
     this.drainGeneration++;
 
     // Remove any pending unlock listener so it doesn't fire after stop
-    if (this.pendingUnlock) {
+    if (this.pendingUnlock && this.canUseDocumentListeners()) {
       document.removeEventListener('click', this.pendingUnlock);
       document.removeEventListener('touchstart', this.pendingUnlock);
       this.pendingUnlock = null;

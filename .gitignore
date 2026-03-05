@@ -49,6 +49,4 @@ assets/*-with-bg.png
 
 # local Cursor MCP config (contains local secrets)
 .cursor/mcp.json
-
-# raw source meditation audio (too large for git)
 meditation-sounds/

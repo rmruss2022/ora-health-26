@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { AuthContext } from '../context/AuthContext';
+import { API_URL, getWebSocketURL } from '../config/api';
 import { theme } from '../theme';
 
 interface Participant {
@@ -61,7 +62,7 @@ export const RoomScreen: React.FC = () => {
   const connectWebSocket = () => {
     try {
       const token = user?.token; // Get auth token
-      const wsUrl = `ws://localhost:4000?token=${token}`;
+      const wsUrl = `${getWebSocketURL()}?token=${token}`;
       const websocket = new WebSocket(wsUrl);
 
       websocket.onopen = () => {
@@ -151,7 +152,7 @@ export const RoomScreen: React.FC = () => {
   const loadRoomDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:4000/api/rooms/${roomId}`);
+      const response = await fetch(`${API_URL}/api/rooms/${roomId}`);
       if (response.ok) {
         const data = await response.json();
         setRoom(data);
@@ -177,7 +178,7 @@ export const RoomScreen: React.FC = () => {
     try {
       setShowJoinConfirm(false);
       
-      const response = await fetch(`http://localhost:4000/api/rooms/${roomId}/join`, {
+      const response = await fetch(`${API_URL}/api/rooms/${roomId}/join`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -215,7 +216,7 @@ export const RoomScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await fetch(`http://localhost:4000/api/rooms/${roomId}/leave`, {
+              const response = await fetch(`${API_URL}/api/rooms/${roomId}/leave`, {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',

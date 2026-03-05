@@ -45,6 +45,7 @@ const PORT = process.env.PORT || 3000;
 const configuredOrigins = process.env.ALLOWED_ORIGINS?.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean) || [];
+const isDev = process.env.NODE_ENV !== 'production';
 
 // Middleware
 app.use(cors({
@@ -55,13 +56,22 @@ app.use(cors({
       return;
     }
 
+    // In development, allow all origins (Expo dev client, React Native, etc.)
+    if (isDev) {
+      callback(null, true);
+      return;
+    }
+
     const isLocalhost =
       /^http:\/\/localhost:\d+$/.test(requestOrigin) ||
       /^http:\/\/127\.0\.0\.1:\d+$/.test(requestOrigin);
+    const isExpoOrNative =
+      /^exp(\+[a-z0-9-]+)?:\/\//.test(requestOrigin) ||
+      /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(requestOrigin);
     const isExplicitlyAllowed =
       configuredOrigins.length === 0 || configuredOrigins.includes(requestOrigin);
 
-    if (isLocalhost || isExplicitlyAllowed) {
+    if (isLocalhost || isExpoOrNative || isExplicitlyAllowed) {
       callback(null, true);
       return;
     }

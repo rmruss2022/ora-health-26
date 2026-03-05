@@ -160,8 +160,16 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
     transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] }) }],
   });
 
-  // Show last 4 messages as transcript
-  const transcript = messages.slice(-4);
+  // Show last 8 messages as transcript
+  const transcript = messages.slice(-8);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to end when new messages arrive
+  useEffect(() => {
+    if (transcript.length > 0) {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [transcript.length, transcript[transcript.length - 1]?.id]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onExit}>
@@ -177,12 +185,14 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Transcript rail */}
+          {/* Transcript rail — scrollable, full text */}
           <View style={styles.transcriptContainer}>
             <ScrollView
+              ref={scrollRef}
               style={styles.transcriptScroll}
               contentContainerStyle={styles.transcriptContent}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
             >
               {transcript.map((msg) => (
                 <View
@@ -197,7 +207,6 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
                       styles.transcriptText,
                       msg.role === 'user' ? styles.transcriptUserText : styles.transcriptAssistantText,
                     ]}
-                    numberOfLines={3}
                   >
                     {msg.content}
                   </Text>
@@ -285,14 +294,18 @@ const styles = StyleSheet.create({
   },
   transcriptContainer: {
     width: '100%',
-    maxHeight: 200,
+    flex: 1,
+    minHeight: 120,
+    maxHeight: 280,
   },
   transcriptScroll: {
-    flexGrow: 0,
+    flex: 1,
   },
   transcriptContent: {
     gap: 8,
     paddingVertical: 4,
+    paddingBottom: 16,
+    flexGrow: 1,
   },
   transcriptBubble: {
     maxWidth: SCREEN_W * 0.72,

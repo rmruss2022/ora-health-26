@@ -1,6 +1,6 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, SafeAreaView } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/context/AuthContext';
@@ -22,9 +22,9 @@ export default function App() {
       <ElevenLabsAgentProvider>
         <AuthProvider>
           <OnboardingProvider>
-            <SafeAreaView style={styles.container}>
+            <View style={styles.container}>
               <AppNavigator />
-            </SafeAreaView>
+            </View>
             <StatusBar style="auto" />
           </OnboardingProvider>
         </AuthProvider>
