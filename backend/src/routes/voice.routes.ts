@@ -9,5 +9,6 @@ const router = Router();
 router.post('/conversation-token', voiceController.createConversationToken.bind(voiceController));
 router.use(authenticateToken);
 router.post('/tool-call', voiceController.executeToolCall.bind(voiceController));
+router.post('/conversation-log', voiceController.logConversationMessage.bind(voiceController));
 
 export default router;

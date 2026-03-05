@@ -66,6 +66,10 @@ async function maybeResolveClientTool(params: any, payload: any): Promise<void> 
   }
 }
 
+function generateSessionId(): string {
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOptions) {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [active, setActive] = useState(false);
@@ -73,6 +77,8 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
   const [error, setError] = useState<string | null>(null);
   const [micMuted, setMicMuted] = useState(false);
   const isStartingRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const messageOrderRef = useRef(0);
 
   const resolvedAgentId = agentId || DEFAULT_AGENT_ID || '';
   const available = Platform.OS !== 'web';
@@ -90,12 +96,14 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       setActive(false);
       setVoiceState('idle');
       setMicMuted(false);
+      sessionIdRef.current = null;
     },
     onError: (err: any) => {
       console.error('[useElevenVoiceAgent] conversation error:', err);
       setError(err?.message || 'Voice session failed');
       setVoiceState('idle');
       setActive(false);
+      sessionIdRef.current = null;
     },
     onStatusChange: (prop: any) => {
       console.log('[useElevenVoiceAgent] status:', prop?.status);
@@ -115,6 +123,19 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
           || `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       );
       setMessages((prev) => [...prev, { id, role, content: text }]);
+
+      // Log to backend for transcript analysis (fire-and-forget)
+      const sid = sessionIdRef.current;
+      if (sid && userId) {
+        const order = messageOrderRef.current++;
+        voiceAgentAPI.logMessage({
+          sessionId: sid,
+          role,
+          content: text,
+          agentId: resolvedAgentId || undefined,
+          messageOrder: order,
+        });
+      }
     },
     onUnhandledClientToolCall: async (params: any) => {
       const toolName = String(
@@ -182,6 +203,8 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       } catch {
         // Ignore if no active session exists.
       }
+      sessionIdRef.current = generateSessionId();
+      messageOrderRef.current = 0;
       const tokenPayload = await voiceAgentAPI.getConversationToken(resolvedAgentId || undefined);
       await conversation.startSession({
         conversationToken: tokenPayload.token,
@@ -189,7 +212,17 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       });
     } catch (err: any) {
       console.error('[useElevenVoiceAgent] startSession error:', err);
-      setError(err?.message || 'Could not start voice session');
+      sessionIdRef.current = null;
+      const msg = err?.message || '';
+      const isTimeout =
+        msg.includes('i/o timeout') ||
+        msg.includes('room_creation_failed') ||
+        msg.includes('TimeoutError');
+      setError(
+        isTimeout
+          ? 'Voice service is temporarily busy. Please try again in a moment.'
+          : msg || 'Could not start voice session'
+      );
       setVoiceState('idle');
       setActive(false);
     } finally {

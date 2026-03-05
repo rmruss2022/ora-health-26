@@ -31,7 +31,14 @@ export class APIClient {
 
   private async initialize() {
     try {
-      // Import dynamically to avoid circular dependencies
+      // Prefer token from secureStorage (real login) over mock auth
+      const { secureStorage } = await import('../secureStorage');
+      const storedToken = await secureStorage.getAccessToken();
+      if (storedToken) {
+        this.authToken = storedToken;
+        return;
+      }
+      // Fallback: mock auth for dev when no session
       const { mockAuth } = await import('./mockAuth');
       const token = await mockAuth.getOrCreateTestUser();
       this.authToken = token;

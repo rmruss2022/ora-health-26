@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { profileService } from '../services/profile.service';
 import { aiToolsService } from '../services/ai-tools.service';
+import { postgresService } from '../services/postgres.service';
 
 interface ConversationTokenResponse {
   token: string;
@@ -54,23 +55,47 @@ class VoiceController {
     }
 
     try {
-      const tokenUrl = `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`;
-      const elevenResponse = await fetch(tokenUrl, {
-        method: 'GET',
-        headers: {
-          'xi-api-key': elevenApiKey,
-        },
-      });
+    const tokenUrl = `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`;
+    const fetchOpts: RequestInit = {
+      method: 'GET',
+      headers: { 'xi-api-key': elevenApiKey },
+      signal: AbortSignal.timeout(15000), // 15s timeout
+    };
 
-      if (!elevenResponse.ok) {
-        const errText = await elevenResponse.text().catch(() => '');
+    let elevenResponse: Awaited<ReturnType<typeof fetch>>;
+    let lastErrText = '';
+    const maxRetries = 2;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        elevenResponse = await fetch(tokenUrl, fetchOpts);
+        lastErrText = await elevenResponse.text().catch(() => '');
+
+        if (elevenResponse.ok) break;
+
+        // Retry on 500 (transient ElevenLabs issues)
+        if (elevenResponse.status === 500 && attempt < maxRetries) {
+          console.warn(`[VoiceController] Token fetch 500, retry ${attempt + 1}/${maxRetries}`);
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+
         return res.status(502).json({
           error: 'Failed to create conversation token',
-          message: `ElevenLabs responded ${elevenResponse.status}: ${errText}`,
+          message: `ElevenLabs responded ${elevenResponse.status}: ${lastErrText}`,
         });
+      } catch (fetchErr: any) {
+        if (attempt < maxRetries && (fetchErr?.name === 'TimeoutError' || fetchErr?.message?.includes('timeout'))) {
+          console.warn(`[VoiceController] Token fetch timeout, retry ${attempt + 1}/${maxRetries}`);
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw fetchErr;
       }
+    }
 
-      const body = (await elevenResponse.json()) as ConversationTokenResponse;
+    try {
+      const body = JSON.parse(lastErrText) as ConversationTokenResponse;
       if (!body?.token) {
         return res.status(502).json({
           error: 'Invalid token response',
@@ -83,13 +108,20 @@ class VoiceController {
         agentId,
         userId: req.userId ?? null,
       });
-    } catch (error: any) {
-      console.error('[VoiceController] createConversationToken error:', error);
-      return res.status(500).json({
+    } catch (parseErr: any) {
+      console.error('[VoiceController] createConversationToken parse error:', parseErr);
+      return res.status(502).json({
         error: 'Failed to create conversation token',
-        message: error?.message || 'Unknown error',
+        message: 'Invalid response from ElevenLabs',
       });
     }
+  } catch (error: any) {
+    console.error('[VoiceController] createConversationToken error:', error);
+    return res.status(500).json({
+      error: 'Failed to create conversation token',
+      message: error?.message || 'Unknown error',
+    });
+  }
   }
 
   /**
@@ -184,6 +216,51 @@ class VoiceController {
       console.error('[VoiceController] executeToolCall error:', toolName, error?.message, error);
       return res.status(500).json({
         error: 'Tool execution failed',
+        message: error?.message || 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * POST /api/voice/conversation-log
+   * Logs a single voice conversation message (user or assistant) for transcript analysis.
+   */
+  async logConversationMessage(req: AuthRequest, res: Response) {
+    const userId = req.userId;
+    const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
+    const role = req.body?.role === 'user' || req.body?.role === 'assistant' ? req.body.role : null;
+    const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+    const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : undefined;
+    const messageOrder = typeof req.body?.messageOrder === 'number' ? req.body.messageOrder : 0;
+
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'No authenticated user found',
+      });
+    }
+
+    if (!sessionId || !role || !content) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'sessionId, role, and content are required',
+      });
+    }
+
+    try {
+      await postgresService.saveVoiceConversationLog({
+        userId,
+        sessionId,
+        role,
+        content,
+        agentId: agentId || undefined,
+        messageOrder,
+      });
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error('[VoiceController] logConversationMessage error:', error);
+      return res.status(500).json({
+        error: 'Failed to log message',
         message: error?.message || 'Unknown error',
       });
     }

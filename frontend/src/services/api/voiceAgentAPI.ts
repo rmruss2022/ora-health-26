@@ -12,6 +12,14 @@ export interface VoiceToolCallResponse {
   result: any;
 }
 
+export interface VoiceLogMessagePayload {
+  sessionId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  agentId?: string;
+  messageOrder?: number;
+}
+
 class VoiceAgentAPI {
   async getConversationToken(agentId?: string): Promise<ConversationTokenPayload> {
     return apiClient.post<ConversationTokenPayload>('/api/voice/conversation-token', {
@@ -24,6 +32,18 @@ class VoiceAgentAPI {
       toolName,
       args: args || {},
     });
+  }
+
+  /**
+   * Log a voice conversation message to the backend for transcript analysis.
+   * Fire-and-forget: does not throw, does not block UI.
+   */
+  logMessage(payload: VoiceLogMessagePayload): void {
+    apiClient
+      .post<{ success: boolean }>('/api/voice/conversation-log', payload)
+      .catch((err) => {
+        console.warn('[voiceAgentAPI] logMessage failed:', err?.message);
+      });
   }
 }
 

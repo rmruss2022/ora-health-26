@@ -174,8 +174,8 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onExit}>
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        {/* Container blocks accidental background touches; exit via × only */}
-        <Pressable style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
+        {/* Use View instead of Pressable - Pressable intercepts touches and prevents ScrollView from scrolling */}
+        <View style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
 
           {/* Header */}
           <View style={styles.header}>
@@ -193,6 +193,7 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
               contentContainerStyle={styles.transcriptContent}
               showsVerticalScrollIndicator={true}
               bounces={true}
+              nestedScrollEnabled={true}
             >
               {transcript.map((msg) => (
                 <View
@@ -245,7 +246,7 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
             ) : null}
           </View>
 
-        </Pressable>
+        </View>
       </Animated.View>
     </Modal>
   );

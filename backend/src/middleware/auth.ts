@@ -15,6 +15,7 @@ export const authenticateToken = (
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
+    console.warn('[Auth] Request rejected: no Authorization token', req.path);
     return res.status(401).json({ error: 'Authentication token required' });
   }
 
@@ -28,6 +29,7 @@ export const authenticateToken = (
     req.userEmail = decoded.email;
     next();
   } catch (error) {
+    console.warn('[Auth] Request rejected: invalid or expired token', req.path);
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };

@@ -192,6 +192,31 @@ export class PostgresService {
     return result.rows.reverse();
   }
 
+  // ===== VOICE CONVERSATION LOGS =====
+
+  async saveVoiceConversationLog(data: {
+    userId: string;
+    sessionId: string;
+    role: 'user' | 'assistant';
+    content: string;
+    agentId?: string;
+    messageOrder?: number;
+  }): Promise<void> {
+    await query(
+      `INSERT INTO voice_conversation_logs
+       (user_id, session_id, role, content, agent_id, message_order)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        data.userId,
+        data.sessionId,
+        data.role,
+        data.content,
+        data.agentId || null,
+        data.messageOrder ?? 0,
+      ]
+    );
+  }
+
   // ===== BEHAVIOR TRANSITIONS =====
 
   async recordBehaviorTransition(data: {
