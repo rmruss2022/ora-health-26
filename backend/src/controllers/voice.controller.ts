@@ -226,6 +226,11 @@ class VoiceController {
    * Logs a single voice conversation message (user or assistant) for transcript analysis.
    */
   async logConversationMessage(req: AuthRequest, res: Response) {
+    console.log('[VoiceController] logConversationMessage received', {
+      hasUserId: !!req.userId,
+      sessionId: req.body?.sessionId?.slice?.(0, 30),
+      role: req.body?.role,
+    });
     const userId = req.userId;
     const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
     const role = req.body?.role === 'user' || req.body?.role === 'assistant' ? req.body.role : null;
@@ -234,6 +239,7 @@ class VoiceController {
     const messageOrder = typeof req.body?.messageOrder === 'number' ? req.body.messageOrder : 0;
 
     if (!userId) {
+      console.warn('[VoiceController] logConversationMessage rejected: no userId');
       return res.status(401).json({
         error: 'Authentication required',
         message: 'No authenticated user found',
@@ -256,6 +262,7 @@ class VoiceController {
         agentId: agentId || undefined,
         messageOrder,
       });
+      console.log('[VoiceController] logConversationMessage saved', { userId, role, contentLen: content.length });
       return res.json({ success: true });
     } catch (error: any) {
       console.error('[VoiceController] logConversationMessage error:', error);

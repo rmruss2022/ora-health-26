@@ -39,10 +39,12 @@ class VoiceAgentAPI {
    * Fire-and-forget: does not throw, does not block UI.
    */
   logMessage(payload: VoiceLogMessagePayload): void {
+    console.log('[voiceAgentAPI] logMessage sending', { role: payload.role, sessionId: payload.sessionId?.slice(0, 20) });
     apiClient
       .post<{ success: boolean }>('/api/voice/conversation-log', payload)
+      .then(() => console.log('[voiceAgentAPI] logMessage ok'))
       .catch((err) => {
-        console.warn('[voiceAgentAPI] logMessage failed:', err?.message);
+        console.warn('[voiceAgentAPI] logMessage failed:', err?.message, err?.statusCode);
       });
   }
 }

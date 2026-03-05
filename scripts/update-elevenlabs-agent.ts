@@ -32,8 +32,8 @@ const API_KEY =
 
 // Ora persona voice (River) — matches chat TTS
 const ORA_VOICE_ID = 'SAz9YHcvj6GT2YYXdXww';
-// Claude to align with chat tab's Anthropic usage
-const ORA_LLM = 'claude-3-5-sonnet';
+// Claude Sonnet 4.5 — ElevenLabs model ID
+const ORA_LLM = 'claude-sonnet-4-5';
 
 // First message — matches chat tab persona-ora (useChat.ts)
 const ORA_FIRST_MESSAGE =

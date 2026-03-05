@@ -115,6 +115,7 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
     },
     onMessage: (msg: any) => {
       const text = extractText(msg).trim();
+      console.log('[useElevenVoiceAgent] onMessage raw', { hasText: !!text, keys: msg ? Object.keys(msg) : [] });
       if (!text) return;
       const role = extractRole(msg);
       const id = String(
@@ -128,12 +129,18 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       const sid = sessionIdRef.current;
       if (sid && userId) {
         const order = messageOrderRef.current++;
+        console.log('[useElevenVoiceAgent] onMessage -> logMessage', { role, order, len: text.length });
         voiceAgentAPI.logMessage({
           sessionId: sid,
           role,
           content: text,
           agentId: resolvedAgentId || undefined,
           messageOrder: order,
+        });
+      } else {
+        console.log('[useElevenVoiceAgent] onMessage skip log (no sessionId or userId)', {
+          hasSessionId: !!sid,
+          hasUserId: !!userId,
         });
       }
     },
