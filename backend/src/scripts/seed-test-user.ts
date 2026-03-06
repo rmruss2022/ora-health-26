@@ -1,5 +1,5 @@
 /**
- * Seed script — populates the test user with realistic data
+ * Seed script — populates a user with realistic data
  * so the AI chat has real context to reference.
  *
  * Run: npx ts-node src/scripts/seed-test-user.ts
@@ -7,19 +7,23 @@
 
 import { query, closePool } from '../config/database';
 
-const TEST_USER_ID = 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa';
+const SEED_EMAIL = 'mattrussellc@gmail.com';
 
 async function seed() {
-  console.log('🌱 Seeding test user data...\n');
+  console.log('🌱 Seeding user data...\n');
 
-  // 1. Ensure user row exists
-  await query(
-    `INSERT INTO users (id, email, name, password_hash)
-     VALUES ($1, 'test@ora.ai', 'Matthew', 'BYPASSED')
-     ON CONFLICT (id) DO UPDATE SET name = 'Matthew'`,
-    [TEST_USER_ID]
+  // 1. Look up user by email
+  const userRow = await query(
+    `SELECT id, name FROM users WHERE email = $1 AND is_active = true`,
+    [SEED_EMAIL]
   );
-  console.log('✅ User upserted');
+  const userId = userRow.rows[0]?.id;
+  if (!userId) {
+    throw new Error(
+      `User not found: ${SEED_EMAIL}. Register or log in first, then run this script.`
+    );
+  }
+  console.log(`✅ Found user: ${userRow.rows[0]?.name || SEED_EMAIL}`);
 
   // 2. Pick a real meditation ID from the DB
   const medRow = await query(`SELECT id FROM meditations LIMIT 1`);
@@ -35,7 +39,7 @@ async function seed() {
     await query(
       `INSERT INTO meditation_sessions (user_id, meditation_id, started_at, completed_at, duration_completed, created_at)
        VALUES ($1, $2, NOW() - INTERVAL '${daysAgo} days', NOW() - INTERVAL '${daysAgo} days' + INTERVAL '${mins} minutes', $3, NOW() - INTERVAL '${daysAgo} days')`,
-      [TEST_USER_ID, meditationId, mins]
+      [userId, meditationId, mins]
     );
   }
   console.log('✅ Meditation sessions seeded (14 sessions, ~165 total minutes)');
@@ -69,7 +73,7 @@ async function seed() {
        VALUES ($1, $2, $3, $4, NOW() - INTERVAL '${plan.weekOffset} days')
        ON CONFLICT (user_id, week_start_date) DO UPDATE
          SET intentions = EXCLUDED.intentions, goals = EXCLUDED.goals`,
-      [TEST_USER_ID, weekStartStr, plan.intentions, plan.goals]
+      [userId, weekStartStr, plan.intentions, plan.goals]
     );
   }
   console.log('✅ Weekly plans seeded');
@@ -105,7 +109,7 @@ async function seed() {
        ON CONFLICT (user_id, week_start_date) DO UPDATE
          SET reflection = EXCLUDED.reflection, mood_score = EXCLUDED.mood_score,
              learnings = EXCLUDED.learnings, wins = EXCLUDED.wins, challenges = EXCLUDED.challenges`,
-      [TEST_USER_ID, weekStartStr, review.reflection, review.learnings, review.wins, review.challenges, review.mood_score]
+      [userId, weekStartStr, review.reflection, review.learnings, review.wins, review.challenges, review.mood_score]
     );
   }
   console.log('✅ Weekly reviews seeded');
@@ -113,11 +117,11 @@ async function seed() {
   // 6. Clear agent memory cache so fresh data is fetched next request
   await query(
     `DELETE FROM agent_memory_cache WHERE user_id = $1`,
-    [TEST_USER_ID]
+    [userId]
   );
   console.log('✅ Agent memory cache cleared');
 
-  console.log('\n🎉 Done! The test user now has:');
+  console.log(`\n🎉 Done! ${SEED_EMAIL} now has:`);
   console.log('  • 14 meditation sessions over the past 3 weeks');
   console.log('  • 3 weekly plans (current week + last 2)');
   console.log('  • 2 weekly reviews with mood scores (6-7/10)');

@@ -25,6 +25,7 @@ import { CommunityPost, PostCategory, InboxMessage } from '../types';
 import { PostCard } from '../components/community/PostCard';
 import { CategoryFilter } from '../components/community/CategoryFilter';
 import { FloatingAuraAgent } from '../components/FloatingAuraAgent';
+import { useAuth } from '../context/AuthContext';
 
 interface CommunityScreenProps {
   navigation: any;
@@ -118,6 +119,7 @@ const FALLBACK_POSTS: CommunityPost[] = [
 
 export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { logout } = useAuth();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [letters, setLetters] = useState<InboxMessage[]>([]);
   const [categories, setCategories] = useState<PostCategory[]>([]);
@@ -251,13 +253,22 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
               <Text style={styles.headerSubtitle}>Share your journey, lift each other</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.newPostButton}
-            onPress={() => navigation.navigate('CreatePost')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.newPostIcon}>+</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={logout}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.logoutText}>Sign out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.newPostButton}
+              onPress={() => navigation.navigate('CreatePost')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.newPostIcon}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -449,6 +460,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8A8A8A',
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(163, 163, 163, 0.45)',
+    backgroundColor: 'transparent',
+  },
+  logoutText: {
+    fontSize: 13,
+    color: '#8A8A8A',
+    fontWeight: '500',
   },
   newPostButton: {
     minWidth: 68,

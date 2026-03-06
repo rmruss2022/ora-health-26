@@ -15,7 +15,7 @@ export const authenticateToken = (
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
-    console.warn('[Auth] Request rejected: no Authorization token', req.path);
+    console.warn('[Auth] 401: no Authorization header', req.method, req.path);
     return res.status(401).json({ error: 'Authentication token required' });
   }
 

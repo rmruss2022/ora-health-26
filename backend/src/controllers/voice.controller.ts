@@ -56,11 +56,13 @@ class VoiceController {
 
     try {
     const tokenUrl = `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`;
+    const tokenTimeoutMs = 25000; // 25s — ElevenLabs can be slow under load
     const fetchOpts: RequestInit = {
       method: 'GET',
       headers: { 'xi-api-key': elevenApiKey },
-      signal: AbortSignal.timeout(15000), // 15s timeout
+      signal: AbortSignal.timeout(tokenTimeoutMs),
     };
+    console.log('[VoiceController] createConversationToken fetching', { agentId });
 
     let elevenResponse: Awaited<ReturnType<typeof fetch>>;
     let lastErrText = '';
@@ -85,11 +87,18 @@ class VoiceController {
           message: `ElevenLabs responded ${elevenResponse.status}: ${lastErrText}`,
         });
       } catch (fetchErr: any) {
-        if (attempt < maxRetries && (fetchErr?.name === 'TimeoutError' || fetchErr?.message?.includes('timeout'))) {
-          console.warn(`[VoiceController] Token fetch timeout, retry ${attempt + 1}/${maxRetries}`);
+        const isTimeout =
+          fetchErr?.name === 'TimeoutError' ||
+          fetchErr?.name === 'AbortError' ||
+          fetchErr?.message?.includes('timeout');
+        if (attempt < maxRetries && isTimeout) {
+          console.warn(
+            `[VoiceController] Token fetch timeout (${fetchErr?.message}), retry ${attempt + 1}/${maxRetries}`
+          );
           await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
           continue;
         }
+        console.error('[VoiceController] createConversationToken fetch failed:', fetchErr?.message);
         throw fetchErr;
       }
     }
@@ -175,7 +184,35 @@ class VoiceController {
       // Profile tools (existing)
       switch (toolName) {
         case 'get_user_profile': {
-          const profile = await profileService.getUserProfile(userId);
+          let profile = await profileService.getUserProfile(userId);
+          if (!profile) {
+            const user = await postgresService.getUserById(userId);
+            profile = user
+              ? {
+                  id: user.id,
+                  user_id: user.id,
+                  email: user.email,
+                  name: user.name,
+                  avatar_url: user.avatar_url,
+                  quiz_responses: null,
+                  quiz_version: '1.0',
+                  quiz_completed_at: null,
+                  quiz_started_at: null,
+                  suggested_behaviors: [],
+                  notification_frequency: null,
+                  preferred_check_in_time: null,
+                  content_difficulty_level: 5,
+                  primary_goals: [],
+                  focus_area: null,
+                  reflection_styles: [],
+                  motivation_drivers: [],
+                  stress_baseline: null,
+                  created_at: new Date(),
+                  updated_at: new Date(),
+                  revision_count: 0,
+                }
+              : null;
+          }
           return res.json({ success: true, toolName, result: profile });
         }
 

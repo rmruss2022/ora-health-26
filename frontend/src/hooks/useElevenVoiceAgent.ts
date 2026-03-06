@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useConversation } from '@elevenlabs/react-native';
 import { Audio } from 'expo-av';
 import { voiceAgentAPI } from '../services/api/voiceAgentAPI';
-import { API_CONFIG } from '../config/api';
+import { apiClient } from '../services/api/apiClient';
+import { secureStorage } from '../services/secureStorage';
 
 export type VoiceState = 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
@@ -46,25 +47,26 @@ function extractRole(message: any): 'user' | 'assistant' {
   return 'assistant';
 }
 
-function safeStringify(value: unknown, maxChars = 2400): string {
-  try {
-    const text = JSON.stringify(value);
-    return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
-  } catch {
-    return String(value);
-  }
-}
-
-async function maybeResolveClientTool(params: any, payload: any): Promise<void> {
-  const candidates = ['respond', 'resolve', 'sendResult', 'onResult'];
-  for (const key of candidates) {
-    const fn = params?.[key];
-    if (typeof fn === 'function') {
-      await fn(payload);
-      return;
-    }
-  }
-}
+const ALLOWED_TOOL_NAMES = [
+  'get_user_profile',
+  'update_user_profile',
+  'get_user_recommendations',
+  'get_user_summaries',
+  'get_recent_journal_entries',
+  'search_journal_entries',
+  'get_conversation_history',
+  'save_user_insight',
+  'get_available_activities',
+  'search_activities',
+  'get_user_progress',
+  'get_user_letters',
+  'get_meditation_sessions',
+  'get_inbox_messages',
+  'save_weekly_plan',
+  'get_weekly_plan',
+  'save_weekly_review',
+  'get_weekly_review',
+] as const;
 
 function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
@@ -80,10 +82,47 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
   const sessionIdRef = useRef<string | null>(null);
   const messageOrderRef = useRef(0);
 
+  // Sync token from secureStorage when we have userId (fixes race where AuthContext hasn't synced yet)
+  useEffect(() => {
+    if (!userId) return;
+    secureStorage.getAccessToken().then((token) => {
+      if (token) apiClient.setAuthToken(token);
+    });
+  }, [userId]);
+
   const resolvedAgentId = agentId || DEFAULT_AGENT_ID || '';
   const available = Platform.OS !== 'web';
 
+  const clientTools = useMemo(() => {
+    const createHandler = (toolName: string) => async (parameters: unknown) => {
+      const args = (parameters && typeof parameters === 'object') ? parameters as Record<string, unknown> : {};
+      const toolStart = Date.now();
+      try {
+        const response = await voiceAgentAPI.executeToolCall(toolName, args);
+        const elapsed = Date.now() - toolStart;
+        console.log('[useElevenVoiceAgent] Tool call OK:', toolName, `(${elapsed}ms)`);
+        return response.result;
+      } catch (err: any) {
+        const statusCode = err?.statusCode ?? err?.status;
+        if (statusCode === 401) {
+          console.log('[useElevenVoiceAgent] Tool 401, retrying after token sync...');
+          await new Promise((r) => setTimeout(r, 600));
+          const response = await voiceAgentAPI.executeToolCall(toolName, args);
+          console.log('[useElevenVoiceAgent] Tool call OK (retry):', toolName);
+          return response.result;
+        }
+        const elapsed = Date.now() - toolStart;
+        console.warn('[useElevenVoiceAgent] Tool failed:', toolName, err?.message, `(${elapsed}ms)`);
+        throw err;
+      }
+    };
+    return Object.fromEntries(
+      ALLOWED_TOOL_NAMES.map((name) => [name, createHandler(name)])
+    );
+  }, []);
+
   const conversation = useConversation({
+    clientTools,
     onConnect: () => {
       setActive(true);
       setVoiceState('listening');
@@ -99,8 +138,15 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       sessionIdRef.current = null;
     },
     onError: (err: any) => {
+      const msg = err?.message || '';
       console.error('[useElevenVoiceAgent] conversation error:', err);
-      setError(err?.message || 'Voice session failed');
+      const isTimeout =
+        msg.includes('timeout') ||
+        msg.includes('ping') ||
+        msg.includes('Stream end encountered');
+      setError(
+        isTimeout ? 'Connection lost. Please try again.' : msg || 'Voice session failed'
+      );
       setVoiceState('idle');
       setActive(false);
       sessionIdRef.current = null;
@@ -144,46 +190,6 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
         });
       }
     },
-    onUnhandledClientToolCall: async (params: any) => {
-      const toolName = String(
-        params?.toolName
-          || params?.name
-          || params?.tool_name
-          || ''
-      ).trim();
-      const args =
-        params?.arguments
-        || params?.args
-        || params?.input
-        || params?.parameters
-        || {};
-
-      if (!toolName) {
-        console.warn('[useElevenVoiceAgent] Tool call missing name:', params);
-        return;
-      }
-
-      const apiUrl = `${API_CONFIG.api.baseURL}/api/voice/tool-call`;
-      console.log('[useElevenVoiceAgent] Tool call:', toolName, '->', apiUrl);
-
-      try {
-        const response = await voiceAgentAPI.executeToolCall(toolName, args);
-        await maybeResolveClientTool(params, response.result);
-        console.log('[useElevenVoiceAgent] Tool result:', toolName, safeStringify(response.result));
-      } catch (err: any) {
-        const message = err?.message || `Tool "${toolName}" failed`;
-        const statusCode = err?.statusCode ?? err?.status;
-        console.warn(
-          '[useElevenVoiceAgent] Tool failed:',
-          toolName,
-          message,
-          statusCode ? `(HTTP ${statusCode})` : '',
-          'URL:',
-          apiUrl
-        );
-        await maybeResolveClientTool(params, { error: message });
-      }
-    },
   });
 
   const enterVoiceMode = useCallback(async () => {
@@ -224,10 +230,13 @@ export function useElevenVoiceAgent({ userId, agentId }: UseElevenVoiceAgentOpti
       const isTimeout =
         msg.includes('i/o timeout') ||
         msg.includes('room_creation_failed') ||
-        msg.includes('TimeoutError');
+        msg.includes('TimeoutError') ||
+        msg.includes('timed out') ||
+        msg.includes('Request timed out') ||
+        msg.includes('ping timeout');
       setError(
         isTimeout
-          ? 'Voice service is temporarily busy. Please try again in a moment.'
+          ? 'Connection timed out. Please try again.'
           : msg || 'Could not start voice session'
       );
       setVoiceState('idle');

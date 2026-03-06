@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi } from '../services/api';
+import { apiClient } from '../services/api/apiClient';
 import { secureStorage } from '../services/secureStorage';
 
 // User type matching backend response
@@ -89,6 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const response = await authApi.getProfile();
       setUser(response.user);
+      // Sync token to apiClient (voice agent, chat, etc.) so it's ready for tool calls
+      const token = await secureStorage.getAccessToken();
+      if (token) apiClient.setAuthToken(token);
     } catch (error) {
       const isNetworkError =
         (error as any)?.message?.includes('Network request failed') ||
@@ -122,6 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Store tokens
       await secureStorage.setTokens(response.accessToken, response.refreshToken);
+
+      // Sync to apiClient (used by voice agent, chat, etc.)
+      apiClient.setAuthToken(response.accessToken);
 
       // Store user data
       await secureStorage.setUserData(response.user);
@@ -158,6 +165,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Store tokens
       await secureStorage.setTokens(response.accessToken, response.refreshToken);
+
+      // Sync to apiClient (used by voice agent, chat, etc.)
+      apiClient.setAuthToken(response.accessToken);
 
       // Store user data
       await secureStorage.setUserData(response.user);
@@ -197,12 +207,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear local storage
       await secureStorage.clearAll();
 
+      // Clear apiClient token so voice/chat etc. stop using it
+      apiClient.clearAuthToken();
+
       // Clear state
       setUser(null);
     } catch (error) {
       console.error('Logout failed:', error);
       // Force clear even if error occurred
       await secureStorage.clearAll();
+      apiClient.clearAuthToken();
       setUser(null);
     } finally {
       setIsLoading(false);

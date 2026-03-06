@@ -21,34 +21,46 @@ export class APIClient {
   }
 
   private async ensureAuthenticated() {
-    if (this.authToken) return;
-
+    if (this.authToken) {
+      if (__DEV__) console.log('[apiClient] ensureAuthenticated: already have token');
+      return;
+    }
+    if (__DEV__) console.log('[apiClient] ensureAuthenticated: no token, running initialize');
     if (!this.initPromise) {
       this.initPromise = this.initialize();
     }
     await this.initPromise;
+    // If we still have no token, clear init so next request retries (e.g. user logged in since)
+    if (!this.authToken) {
+      if (__DEV__) console.log('[apiClient] ensureAuthenticated: still no token after init');
+      this.initPromise = null;
+    } else if (__DEV__) {
+      console.log('[apiClient] ensureAuthenticated: got token from init');
+    }
   }
 
   private async initialize() {
     try {
-      // Prefer token from secureStorage (real login) over mock auth
       const { secureStorage } = await import('../secureStorage');
       const storedToken = await secureStorage.getAccessToken();
       if (storedToken) {
         this.authToken = storedToken;
+        if (__DEV__) console.log('[apiClient] initialize: token from secureStorage');
         return;
       }
-      // Fallback: mock auth for dev when no session
+      if (__DEV__) console.log('[apiClient] initialize: no secureStorage token, trying mockAuth');
       const { mockAuth } = await import('./mockAuth');
       const token = await mockAuth.getOrCreateTestUser();
       this.authToken = token;
+      if (__DEV__) console.log('[apiClient] initialize: mockAuth result:', token ? 'got token' : 'no token');
     } catch (error) {
-      console.error('Failed to initialize auth:', error);
+      console.error('[apiClient] initialize failed:', error);
     }
   }
 
   setAuthToken(token: string) {
     this.authToken = token;
+    if (__DEV__) console.log('[apiClient] setAuthToken called');
   }
 
   clearAuthToken() {
@@ -69,35 +81,55 @@ export class APIClient {
       ...options.headers,
     };
 
-    if (this.authToken) {
+    const hasToken = !!this.authToken;
+    if (hasToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`;
     }
+    if (__DEV__) {
+      const authRelevant = endpoint.includes('/api/voice/') || endpoint.includes('/auth/');
+      if (authRelevant) {
+        console.log('[apiClient] request:', endpoint, '| token:', hasToken ? 'YES' : 'NO');
+      }
+    }
+
+    const timeoutMs = API_CONFIG.api.timeout || 30000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const signal = options.signal ?? controller.signal;
 
     try {
       const response = await fetch(url, {
         ...options,
         headers,
+        signal,
       });
+
+      clearTimeout(timeoutId);
+
+      if (__DEV__) {
+        const authRelevant = endpoint.includes('/api/voice/') || endpoint.includes('/auth/');
+        if (authRelevant) {
+          console.log('[apiClient] response:', endpoint, '| status:', response.status, '| ok:', response.ok);
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || 'Request failed',
-          response.status,
-          errorData.code
-        );
+        const msg = errorData.message || errorData.error || 'Request failed';
+        throw new APIError(msg, response.status, errorData.code);
       }
 
       return await response.json();
     } catch (error) {
+      clearTimeout(timeoutId);
       if (error instanceof APIError) {
         throw error;
       }
-
+      const isAbort = (error as Error)?.name === 'AbortError';
       throw new APIError(
-        'Network request failed',
+        isAbort ? 'Request timed out' : 'Network request failed',
         0,
-        'NETWORK_ERROR'
+        isAbort ? 'TIMEOUT' : 'NETWORK_ERROR'
       );
     }
   }
