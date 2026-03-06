@@ -27,7 +27,15 @@ type AllowedToolName =
   | 'save_weekly_plan'
   | 'get_weekly_plan'
   | 'save_weekly_review'
-  | 'get_weekly_review';
+  | 'get_weekly_review'
+  | 'get_quiz_streak'
+  | 'get_quiz_history'
+  | 'get_exercise_completions'
+  | 'get_meditations'
+  | 'get_upcoming_collective_sessions'
+  | 'create_journal_entry'
+  | 'get_user_notifications'
+  | 'get_user_community_posts';
 
 class VoiceController {
   /**
@@ -171,6 +179,14 @@ class VoiceController {
       'get_weekly_plan',
       'save_weekly_review',
       'get_weekly_review',
+      'get_quiz_streak',
+      'get_quiz_history',
+      'get_exercise_completions',
+      'get_meditations',
+      'get_upcoming_collective_sessions',
+      'create_journal_entry',
+      'get_user_notifications',
+      'get_user_community_posts',
     ];
 
     if (!allowedTools.includes(toolName)) {

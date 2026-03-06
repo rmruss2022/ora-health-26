@@ -1,5 +1,5 @@
 /**
- * Update ElevenLabs Ora agent: system prompt, voice (River), LLM (Claude), and all 18 tools.
+ * Update ElevenLabs Ora agent: system prompt, voice (River), LLM (Claude), and all 26 tools.
  * Run: cd backend && npm run update-elevenlabs-agent
  * Requires: ELEVENLABS_API_KEY and ELEVENLABS_ORA_AGENT_ID in backend/.env or frontend/.env
  */
@@ -79,6 +79,13 @@ Breath is your anchor, and you offer it naturally. Not as a prescription ("take 
 - save_weekly_review, get_weekly_review: Weekly reflection
 - save_user_insight: Remember important details about the user
 - get_user_profile, update_user_profile, get_user_recommendations: Profile and recommendations
+- get_quiz_streak, get_quiz_history: Daily check-in streak and history
+- get_exercise_completions: Breathing, stretching, etc.
+- get_meditations: Meditation library (browse by category)
+- get_upcoming_collective_sessions: Group meditation times
+- create_journal_entry: Write to user's journal
+- get_user_notifications: Alerts and reminders
+- get_user_community_posts: User's shared posts
 
 **CONSTRAINTS:**
 - Follow user's lead. Be adaptable. No forced structure.
@@ -290,6 +297,78 @@ const TOOLS_TO_CREATE: Array<{
       properties: {
         week_start: { type: 'string', description: 'Date YYYY-MM-DD (optional)' },
         last_n_weeks: { type: 'integer', description: 'Get last N weeks (alternative)' },
+      },
+    },
+  },
+  {
+    name: 'get_quiz_streak',
+    description: `Get user's daily quiz/check-in streak (current, longest, total). Use when user asks about streak or consistency.`,
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_quiz_history',
+    description: `Get user's recent quiz/check-in history. Use when user asks about past check-ins.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', description: 'Max entries (default 10)' },
+      },
+    },
+  },
+  {
+    name: 'get_exercise_completions',
+    description: `Get user's recent exercise completions (breathing, stretching). Use when user asks about exercise history.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', description: 'Max entries (default 10)' },
+      },
+    },
+  },
+  {
+    name: 'get_meditations',
+    description: `Get meditation library. Use when user wants to browse meditations or find one by category (sleep, anxiety, focus).`,
+    parameters: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', description: 'Optional category filter' },
+      },
+    },
+  },
+  {
+    name: 'get_upcoming_collective_sessions',
+    description: `Get upcoming collective/group meditation sessions. Use when user asks about group meditations.`,
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'create_journal_entry',
+    description: `Create a journal entry for the user. Use when user wants to write or log something.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'Journal content' },
+        mood: { type: 'string', description: 'Optional mood' },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'get_user_notifications',
+    description: `Get user's notifications. Use when user asks about alerts or what they've missed.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', description: 'Max notifications (default 20)' },
+      },
+    },
+  },
+  {
+    name: 'get_user_community_posts',
+    description: `Get user's own community posts. Use when user asks about what they've shared.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', description: 'Max posts (default 10)' },
       },
     },
   },

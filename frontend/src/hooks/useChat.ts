@@ -71,6 +71,9 @@ export const useChat = (
   const cancelStreamRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (__DEV__) {
+      console.log('[useChat] useEffect reset', { behaviorId, personaId });
+    }
     // Cancel any in-flight stream when behavior/persona changes
     if (cancelStreamRef.current) {
       cancelStreamRef.current();
@@ -95,8 +98,23 @@ export const useChat = (
     setError(null);
   }, [behaviorId, personaId]);
 
+  // Debug: log when messages change
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[useChat] messages updated', {
+        count: messages.length,
+        lastId: messages[messages.length - 1]?.id,
+        lastRole: messages[messages.length - 1]?.role,
+        lastContentLen: messages[messages.length - 1]?.content?.length,
+      });
+    }
+  }, [messages]);
+
   const sendMessage = useCallback(
     (text: string) => {
+      if (__DEV__) {
+        console.log('[useChat] sendMessage called', { text: text.slice(0, 50), behaviorId, personaId });
+      }
       // Cancel any previous in-flight stream
       if (cancelStreamRef.current) {
         cancelStreamRef.current();
@@ -138,6 +156,9 @@ export const useChat = (
 
         // onChunk — append delta text; flip isLoading off on the first chunk
         (chunk: string) => {
+          if (__DEV__) {
+            console.log('[useChat] onChunk', { chunkLen: chunk.length, assistantId });
+          }
           setIsLoading(false);
           setMessages((prev) =>
             prev.map((msg) =>
@@ -156,6 +177,9 @@ export const useChat = (
 
         // onDone — mark streaming complete; flush remaining speech buffer
         () => {
+          if (__DEV__) {
+            console.log('[useChat] onDone', { assistantId });
+          }
           if (options?.onSegment && speechBuffer.trim()) {
             options.onSegment(speechBuffer.trim(), assistantId);
             speechBuffer = '';
@@ -193,7 +217,7 @@ export const useChat = (
 
       cancelStreamRef.current = cancel;
     },
-    [personaId, options]
+    [behaviorId, personaId, options]
   );
 
   return {

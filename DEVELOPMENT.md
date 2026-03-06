@@ -12,15 +12,37 @@ bwa/
 ## Starting dev
 
 ```bash
-# From ~/Desktop/Feb26 — starts both frontend + backend
-./reload-dev.sh
+# From bwa/ — starts both backend + frontend, auto-detects LAN IP
+./run         # start (skips if already running)
+./reload      # stop everything, then run again
 
 # Or individually
-cd backend && npm run dev          # API on :4000
-cd frontend && npx expo start --web  # App on :8081
+cd backend && npm run dev            # API on :4000
+cd frontend && npx expo start -c     # App on :8081
 ```
 
 Open `http://localhost:8081` in browser.
+
+### Physical device (iPhone)
+
+The `run` script automatically detects your Mac's LAN IP (tries `en0`, `en1`, `en2`)
+and patches `frontend/.env` before starting Metro. No manual IP editing needed.
+
+On each `./run` or `./reload`, `frontend/.env` is updated:
+
+```
+EXPO_PUBLIC_API_BASE_URL=http://<your-lan-ip>:4000
+```
+
+The terminal output shows the exact URLs to use:
+
+```
+API (phone): http://172.x.x.x:4000
+App (phone): exp://172.x.x.x:8081
+```
+
+If your IP changes (e.g. switching from WiFi to hotspot), just run `./reload` and
+it will re-detect and patch automatically.
 
 ---
 
@@ -30,7 +52,7 @@ Open `http://localhost:8081` in browser.
 
 | Var | Purpose |
 |-----|---------|
-| `EXPO_PUBLIC_API_BASE_URL` | Backend URL (default `http://localhost:4000`) |
+| `EXPO_PUBLIC_API_BASE_URL` | Backend URL — auto-set to LAN IP by `./run`/`./reload` |
 | `EXPO_PUBLIC_ELEVENLABS_API_KEY` | ElevenLabs key for TTS + STT |
 | `EXPO_PUBLIC_FORCE_ONBOARDING` | Set `true` to always show onboarding regardless of stored flags (useful for testing). Requires Metro restart. |
 

@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
+FRONTEND_DIR="$ROOT_DIR/frontend"
+FRONTEND_ENV="$FRONTEND_DIR/.env"
 DESKTOP_BACKEND_ENV="/Users/matthew/Desktop/Feb26/backend/.env"
 RUN_DIR="$ROOT_DIR/.run"
 
@@ -12,6 +14,43 @@ BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 BACKEND_LOG="$RUN_DIR/backend.log"
 FRONTEND_LOG="$RUN_DIR/frontend.log"
+
+PORT="${PORT:-4000}"
+
+# ---------------------------------------------------------------------------
+# Detect LAN IP for physical device access (iPhone etc.)
+# Tries en0 (WiFi), en1, en2 in order; falls back to localhost.
+# ---------------------------------------------------------------------------
+detect_lan_ip() {
+  for iface in en0 en1 en2; do
+    local ip
+    ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+    if [[ -n "$ip" ]]; then
+      echo "$ip"
+      return
+    fi
+  done
+  echo "localhost"
+}
+
+LAN_IP="$(detect_lan_ip)"
+API_BASE_URL="http://${LAN_IP}:${PORT}"
+
+# ---------------------------------------------------------------------------
+# Patch frontend/.env with the current LAN IP so the app and phone both work.
+# Updates API_BASE_URL and EXPO_PUBLIC_API_BASE_URL in-place.
+# ---------------------------------------------------------------------------
+patch_frontend_env() {
+  if [[ ! -f "$FRONTEND_ENV" ]]; then
+    echo "Warning: $FRONTEND_ENV not found, skipping IP patch."
+    return
+  fi
+
+  sed -i '' "s|^API_BASE_URL=.*|API_BASE_URL=${API_BASE_URL}|" "$FRONTEND_ENV"
+  sed -i '' "s|^EXPO_PUBLIC_API_BASE_URL=.*|EXPO_PUBLIC_API_BASE_URL=${API_BASE_URL}|" "$FRONTEND_ENV"
+
+  echo "Patched frontend/.env: API_BASE_URL=${API_BASE_URL}"
+}
 
 is_running_pid() {
   local pid="${1:-}"
@@ -40,13 +79,13 @@ start_backend() {
     if [[ ! -f "$BACKEND_DIR/.env" ]]; then
       load_env_if_present "$DESKTOP_BACKEND_ENV"
     fi
-    export PORT="${PORT:-4000}"
+    export PORT="${PORT}"
     export AI_PROVIDER="${AI_PROVIDER:-anthropic}"
     exec npm run dev
   ) >"$BACKEND_LOG" 2>&1 &
 
   echo $! >"$BACKEND_PID_FILE"
-  echo "Started backend on :${PORT:-4000} (pid $(cat "$BACKEND_PID_FILE"))."
+  echo "Started backend on :${PORT} (pid $(cat "$BACKEND_PID_FILE"))."
 }
 
 start_frontend() {
@@ -56,7 +95,7 @@ start_frontend() {
   fi
 
   (
-    cd "$ROOT_DIR/frontend"
+    cd "$FRONTEND_DIR"
     export CI=false
     exec npm start -- -c
   ) >"$FRONTEND_LOG" 2>&1 &
@@ -65,6 +104,7 @@ start_frontend() {
   echo "Started frontend on :8081 (pid $(cat "$FRONTEND_PID_FILE"))."
 }
 
+patch_frontend_env
 start_backend
 start_frontend
 
@@ -74,5 +114,7 @@ echo "  Backend:  $BACKEND_LOG"
 echo "  Frontend: $FRONTEND_LOG"
 echo
 echo "URLs:"
-echo "  API:  http://localhost:${PORT:-4000}"
-echo "  App:  http://localhost:8081"
+echo "  API (local): http://localhost:${PORT}"
+echo "  API (phone): ${API_BASE_URL}"
+echo "  App (web):   http://localhost:8081"
+echo "  App (phone): exp://${LAN_IP}:8081"

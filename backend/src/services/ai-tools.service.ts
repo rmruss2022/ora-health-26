@@ -1,5 +1,11 @@
 import { postgresService } from './postgres.service';
 import { activitiesService } from './activities.service';
+import { meditationService } from './meditation.service';
+import { quizService } from './quiz.service';
+import { exerciseModel } from '../models/exercise.model';
+import { collectiveSessionService } from './collective-session.service';
+import { notificationService } from './notification.service';
+import { communityService } from './community.service';
 
 // Tool definitions for Claude with proper typing
 export const aiTools = [
@@ -304,6 +310,113 @@ Use this when user asks about how their week went or wants to see past reviews.`
       },
     },
   },
+  {
+    name: 'get_quiz_streak',
+    description: `Get user's daily quiz streak (current streak, longest streak, total completed).
+Use when user asks about their quiz streak or daily check-in consistency.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
+    name: 'get_quiz_history',
+    description: `Get user's recent quiz/check-in history with dates and responses.
+Use when user asks about past check-ins or quiz completion history.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        limit: {
+          type: 'number' as const,
+          description: 'Max number of entries to return (default 10)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_exercise_completions',
+    description: `Get user's recent exercise completions (breathing, stretching, etc).
+Use when user asks about their exercise history or what exercises they've done.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        limit: {
+          type: 'number' as const,
+          description: 'Max number of completions to return (default 10)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_meditations',
+    description: `Get available meditation library (categories and meditations).
+Use when user wants to browse meditations, find a meditation by topic, or see what's available.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        category: {
+          type: 'string' as const,
+          description: 'Optional category filter (e.g. sleep, anxiety, focus)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_upcoming_collective_sessions',
+    description: `Get upcoming collective/group meditation sessions.
+Use when user asks about group meditations or when the next collective session is.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
+    name: 'create_journal_entry',
+    description: `Create a new journal entry for the user.
+Use when user wants to write or log something in their journal.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        content: {
+          type: 'string' as const,
+          description: 'Journal entry content',
+        },
+        mood: {
+          type: 'string' as const,
+          description: 'Optional mood at time of writing',
+        },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'get_user_notifications',
+    description: `Get user's notifications (alerts, reminders, etc).
+Use when user asks about their notifications or what they've missed.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        limit: {
+          type: 'number' as const,
+          description: 'Max notifications to return (default 20)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_user_community_posts',
+    description: `Get user's own community posts (what they've shared).
+Use when user asks about their community posts or what they've shared.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        limit: {
+          type: 'number' as const,
+          description: 'Max posts to return (default 10)',
+        },
+      },
+    },
+  },
 ];
 
 // Tool execution handlers
@@ -370,6 +483,30 @@ export class AIToolsService {
 
       case 'get_weekly_review':
         return this.getWeeklyReview(userId, toolInput.week_start, toolInput.last_n_weeks);
+
+      case 'get_quiz_streak':
+        return this.getQuizStreak(userId);
+
+      case 'get_quiz_history':
+        return this.getQuizHistory(userId, toolInput.limit || 10);
+
+      case 'get_exercise_completions':
+        return this.getExerciseCompletions(userId, toolInput.limit || 10);
+
+      case 'get_meditations':
+        return this.getMeditations(toolInput.category);
+
+      case 'get_upcoming_collective_sessions':
+        return this.getUpcomingCollectiveSessions();
+
+      case 'create_journal_entry':
+        return this.createJournalEntry(userId, toolInput.content, toolInput.mood);
+
+      case 'get_user_notifications':
+        return this.getUserNotifications(userId, toolInput.limit || 20);
+
+      case 'get_user_community_posts':
+        return this.getUserCommunityPosts(userId, toolInput.limit || 10);
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);
@@ -848,6 +985,169 @@ export class AIToolsService {
       notes: review.metadata.notes,
       created_at: review.created_at,
     };
+  }
+
+  private async getQuizStreak(userId: string): Promise<any> {
+    try {
+      const streak = await quizService.getUserStreak(userId);
+      if (!streak) {
+        return { found: false, message: 'No quiz streak data yet. Complete a daily check-in to start.' };
+      }
+      return {
+        found: true,
+        current_streak: streak.current_streak,
+        longest_streak: streak.longest_streak,
+        total_completed: streak.total_completed,
+        last_completed_date: streak.last_completed_date,
+      };
+    } catch (e) {
+      return { found: false, message: 'Quiz streak data is not available.' };
+    }
+  }
+
+  private async getQuizHistory(userId: string, limit: number): Promise<any> {
+    try {
+      const history = await quizService.getUserQuizHistory(userId, limit);
+      if (history.length === 0) {
+        return { found: false, message: 'No quiz history yet.' };
+      }
+      return {
+        found: true,
+        count: history.length,
+        entries: history.map((h: any) => ({
+          quiz_date: h.quiz_date,
+          completed_at: h.completed_at,
+          mood_score: h.mood_score,
+          energy_score: h.energy_score,
+          intentions: h.intentions,
+        })),
+      };
+    } catch (e) {
+      return { found: false, message: 'Quiz history is not available.' };
+    }
+  }
+
+  private async getExerciseCompletions(userId: string, limit: number): Promise<any> {
+    try {
+      const completions = await exerciseModel.getUserCompletions(userId, limit);
+      if (completions.length === 0) {
+        return { found: false, message: 'No exercise completions yet.' };
+      }
+      return {
+        found: true,
+        count: completions.length,
+        completions: completions.map((c: any) => ({
+          exercise_title: c.exercise_title,
+          started_at: c.started_at,
+          completed_at: c.completed_at,
+          duration_minutes: c.duration_minutes,
+          rating: c.rating,
+        })),
+      };
+    } catch (e) {
+      return { found: false, message: 'Exercise completions are not available.' };
+    }
+  }
+
+  private async getMeditations(category?: string): Promise<any> {
+    try {
+      const meditations = category
+        ? await meditationService.getMeditationsByCategory(category)
+        : await meditationService.getAllMeditations();
+      if (meditations.length === 0) {
+        return { found: false, message: category ? `No meditations in category "${category}".` : 'No meditations available.' };
+      }
+      return {
+        found: true,
+        count: meditations.length,
+        meditations: meditations.map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          description: m.description,
+          duration: m.duration,
+          category: m.category,
+          icon: m.icon,
+        })),
+      };
+    } catch (e) {
+      return { found: false, message: 'Meditation library is not available.' };
+    }
+  }
+
+  private async getUpcomingCollectiveSessions(): Promise<any> {
+    try {
+      const session = await collectiveSessionService.getUpcomingSession();
+      if (!session) {
+        return { found: false, message: 'No upcoming collective sessions scheduled.' };
+      }
+      return {
+        found: true,
+        session: {
+          id: session.id,
+          scheduled_time: session.scheduledTime,
+          duration_minutes: session.durationMinutes,
+          participant_count: session.participantCount,
+        },
+      };
+    } catch (e) {
+      return { found: false, message: 'Collective sessions are not available.' };
+    }
+  }
+
+  private async createJournalEntry(userId: string, content: string, mood?: string): Promise<any> {
+    const entryId = await postgresService.createJournalEntry({
+      userId,
+      content,
+      mood,
+    });
+    return {
+      success: true,
+      message: 'Journal entry created.',
+      entry_id: entryId,
+    };
+  }
+
+  private async getUserNotifications(userId: string, limit: number): Promise<any> {
+    const notifications = await notificationService.getUserNotifications(userId, limit);
+    if (notifications.length === 0) {
+      return { found: false, message: 'No notifications.' };
+    }
+    return {
+      found: true,
+      count: notifications.length,
+      notifications: notifications.map((n: any) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        read: n.read,
+        created_at: n.createdAt,
+      })),
+    };
+  }
+
+  private async getUserCommunityPosts(userId: string, limit: number): Promise<any> {
+    try {
+      const posts = await communityService.getPostsByUser(userId, limit);
+      if (posts.length === 0) {
+        return { found: false, message: 'No community posts yet.' };
+      }
+      return {
+        found: true,
+        count: posts.length,
+        posts: posts.map((p: any) => ({
+          id: p.id,
+          type: p.type,
+          category: p.category,
+          content: p.content,
+          likes: p.likes,
+          comments: p.comments,
+          timestamp: p.timestamp,
+        })),
+      };
+    } catch (e) {
+      return { found: false, message: 'Community posts are not available.' };
+    }
   }
 }
 

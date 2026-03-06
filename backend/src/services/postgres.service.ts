@@ -128,11 +128,14 @@ export class PostgresService {
     return result.rows;
   }
 
-  async getJournalEntry(entryId: string): Promise<any | null> {
-    const result = await query(
-      'SELECT * FROM journal_entries WHERE id = $1',
-      [entryId]
-    );
+  async getJournalEntry(entryId: string, userId?: string): Promise<any | null> {
+    let queryText = 'SELECT * FROM journal_entries WHERE id = $1';
+    const params: any[] = [entryId];
+    if (userId) {
+      queryText += ' AND user_id = $2';
+      params.push(userId);
+    }
+    const result = await query(queryText, params);
     return result.rows[0] || null;
   }
 
@@ -149,6 +152,13 @@ export class PostgresService {
       [userId, `%${searchQuery}%`, limit]
     );
     return result.rows;
+  }
+
+  async deleteJournalEntry(userId: string, entryId: string): Promise<void> {
+    await query(
+      'DELETE FROM journal_entries WHERE id = $1 AND user_id = $2',
+      [entryId, userId]
+    );
   }
 
   // ===== CHAT MESSAGES =====

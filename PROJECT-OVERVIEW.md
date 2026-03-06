@@ -84,12 +84,12 @@ API_BASE_URL=http://localhost:3000  # Points to backend API
 - Node.js/Express REST API
 - Handles authentication (JWT)
 - Calls OpenAI API for chat
-- Manages AWS DynamoDB database
+- Manages PostgreSQL database
 - Validates all requests
 - Rate limiting and security
 
 ### What it HAS (securely)
-- ✅ AWS credentials (in .env, never committed)
+- ✅ Database credentials (in .env, never committed)
 - ✅ OpenAI API key (in .env, never committed)
 - ✅ JWT secret for authentication
 - ✅ Full database access
@@ -98,7 +98,7 @@ API_BASE_URL=http://localhost:3000  # Points to backend API
 ```
 shadow-ai-api/
 ├── src/
-│   ├── config/            # AWS & OpenAI setup
+│   ├── config/            # Database & OpenAI setup
 │   ├── controllers/       # Request handlers
 │   ├── services/          # Business logic
 │   ├── routes/            # API endpoints
@@ -120,12 +120,14 @@ npm run dev               # Start development server
 
 ### Configuration
 ```bash
-# shadow-ai-api/.env
-PORT=3000
-AWS_ACCESS_KEY_ID=your_key_here
-AWS_SECRET_ACCESS_KEY=your_secret_here
-AWS_REGION=us-east-1
-OPENAI_API_KEY=sk-your_key_here
+# backend/.env
+PORT=4000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=shadowai
+DB_USER=shadowai
+DB_PASSWORD=your_password
+ANTHROPIC_API_KEY=sk-ant-...
 JWT_SECRET=your_random_secret_string
 ```
 
@@ -144,7 +146,7 @@ Backend validates JWT token
         ↓
 Backend calls OpenAI API (server-side)
         ↓
-Backend saves to DynamoDB (server-side)
+Backend saves to PostgreSQL (server-side)
         ↓
 Backend returns response to Mobile App
         ↓
@@ -168,33 +170,18 @@ const response = await apiClient.post('/chat/messages', {
 // Receives request
 // Validates JWT token
 // Calls OpenAI with server-side API key
-// Saves to DynamoDB with server-side credentials
+// Saves to PostgreSQL with server-side credentials
 // Returns AI response to mobile app
 ```
 
-## AWS Setup Required
+## Database Setup Required
 
-### DynamoDB Tables to Create
+### PostgreSQL Tables
 
-1. **shadow-ai-users**
-   - Partition Key: `id` (String)
-   - GSI: `email-index` with `email` as partition key
+The backend uses PostgreSQL. Run migrations in `backend/src/db/migrations/` to create tables.
 
-2. **shadow-ai-journal-entries**
-   - Partition Key: `userId` (String)
-   - Sort Key: `id` (String)
-
-3. **shadow-ai-chat-messages**
-   - Partition Key: `userId` (String)
-   - Sort Key: `timestamp` (String)
-
-4. **shadow-ai-community-posts**
-   - Partition Key: `id` (String)
-   - GSI: `createdAt-index` with `createdAt` as partition key
-
-5. **shadow-ai-community-comments**
-   - Partition Key: `postId` (String)
-   - Sort Key: `id` (String)
+Key tables: `users`, `journal_entries`, `chat_messages`, `community_posts`, etc.
+Run migrations in order from `backend/src/db/migrations/`.
 
 ## Development Workflow
 
@@ -222,7 +209,7 @@ npm start
 ### Step 4: Test
 ```bash
 # Mobile app calls http://localhost:3000/auth/signup
-# Backend creates user in DynamoDB
+# Backend creates user in PostgreSQL
 # Backend returns JWT token
 # Mobile app stores token
 # Mobile app makes authenticated requests
@@ -231,7 +218,7 @@ npm start
 ## Security Checklist
 
 ### Mobile App (shadow-ai)
-- ✅ No AWS credentials in code
+- ✅ No database credentials in code
 - ✅ No OpenAI keys in code
 - ✅ Only stores JWT token
 - ✅ All requests over HTTPS (production)
@@ -248,11 +235,11 @@ npm start
 ## Next Steps
 
 ### 1. Set Up Backend
-1. Create AWS account and get credentials
+1. Set up PostgreSQL database
 2. Get OpenAI API key
-3. Fill out `shadow-ai-api/.env`
-4. Create DynamoDB tables
-5. Run `npm run dev` in shadow-ai-api
+3. Fill out `backend/.env` (DB_*, JWT_SECRET, etc.)
+4. Run migrations
+5. Run `npm run dev` in backend
 
 ### 2. Configure Mobile App
 1. Update `shadow-ai/.env` with backend URL
@@ -321,4 +308,4 @@ GET    /health                   # Check API status
 
 **Security:** ✅ Proper separation of concerns - credentials only in backend
 
-**Next:** Set up AWS, configure environment variables, start backend API
+**Next:** Set up PostgreSQL, configure environment variables, start backend API

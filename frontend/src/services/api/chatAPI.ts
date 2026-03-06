@@ -23,6 +23,9 @@ export class ChatAPI {
     onError: (err: Error) => void
   ): () => void {
     const controller = new AbortController();
+    if (__DEV__) {
+      console.log('[chatAPI] streamMessage start', { content: message.content.slice(0, 40) });
+    }
 
     (async () => {
       // Re-use apiClient's lazy auth init by casting to any to access private fields
@@ -58,6 +61,9 @@ export class ChatAPI {
       }
 
       const reader = response.body?.getReader();
+      if (__DEV__) {
+        console.log('[chatAPI] stream response', { ok: response.ok, hasReader: !!reader });
+      }
       if (!reader) {
         // Some React Native runtimes (notably iOS native/dev builds) may not expose
         // a ReadableStream reader on fetch responses. Fall back to non-stream mode.
@@ -100,6 +106,7 @@ export class ChatAPI {
 
             const payload = trimmed.slice(5).trim();
             if (payload === '[DONE]') {
+              if (__DEV__) console.log('[chatAPI] [DONE] received');
               onDone();
               return;
             }
@@ -111,6 +118,9 @@ export class ChatAPI {
                 return;
               }
               if (typeof parsed.text === 'string') {
+                if (__DEV__) {
+                  console.log('[chatAPI] chunk', { len: parsed.text.length });
+                }
                 onChunk(parsed.text);
               }
             } catch {
@@ -127,6 +137,7 @@ export class ChatAPI {
       }
 
       // Stream body ended without an explicit [DONE] — treat as complete
+      if (__DEV__) console.log('[chatAPI] stream ended, calling onDone');
       onDone();
     })();
 

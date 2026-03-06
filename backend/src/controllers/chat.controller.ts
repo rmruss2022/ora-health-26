@@ -7,7 +7,7 @@ import { PERSONAS } from '../config/behaviors';
 class ChatController {
   async streamMessage(req: AuthRequest, res: Response) {
     const { content, behaviorId } = req.body;
-    const userId = req.userId || 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa';
+    const userId = req.userId!;
 
     if (!content || !behaviorId) {
       res.status(400).json({ error: 'Content and behaviorId required' });
@@ -69,7 +69,7 @@ class ChatController {
   async sendMessage(req: AuthRequest, res: Response) {
     try {
       const { content, behaviorId } = req.body;
-      const userId = req.userId || 'f08ffbd7-ccd6-4a2f-ae08-ed0e007d70fa'; // test@example.com
+      const userId = req.userId!;
 
       if (!content || !behaviorId) {
         return res.status(400).json({ error: 'Content and behaviorId required' });

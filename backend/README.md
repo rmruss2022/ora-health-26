@@ -1,16 +1,16 @@
 # Shadow AI - Backend API
 
-This is the secure backend API for the Shadow AI mobile app. It handles all AWS operations, OpenAI integration, and database access.
+This is the secure backend API for the Shadow AI mobile app. It handles PostgreSQL database access, OpenAI integration, and AI/voice features.
 
 ## Architecture
 
 ```
-Mobile App (React Native)  →  Backend API  →  AWS DynamoDB
+Mobile App (React Native)  →  Backend API  →  PostgreSQL
                                   ↓
                               OpenAI API
 ```
 
-**Security:** The mobile app NEVER has direct access to AWS credentials or OpenAI keys. All sensitive operations happen server-side.
+**Security:** The mobile app NEVER has direct access to database credentials or OpenAI keys. All sensitive operations happen server-side.
 
 ## Setup
 
@@ -29,10 +29,8 @@ cp .env.example .env
 ```
 
 Required variables:
-- `AWS_ACCESS_KEY_ID` - Your AWS access key
-- `AWS_SECRET_ACCESS_KEY` - Your AWS secret key
-- `AWS_REGION` - AWS region (e.g., us-east-1)
-- `OPENAI_API_KEY` - Your OpenAI API key
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - PostgreSQL connection
+- `ANTHROPIC_API_KEY` or `NVIDIA_API_KEY` - AI provider
 - `JWT_SECRET` - Secret for signing JWTs (generate a strong random string)
 
 ### 3. Run Development Server

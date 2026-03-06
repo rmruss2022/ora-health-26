@@ -1,5 +1,5 @@
 import { callKimiAPI, getKimiConfig } from '../config/kimi';
-import { getAnthropicClient, ANTHROPIC_CONFIG } from '../config/anthropic';
+import { getAnthropicClient, ANTHROPIC_CONFIG, convertAiToolsToAnthropic } from '../config/anthropic';
 import { postgresService } from './postgres.service';
 import { aiTools, aiToolsService } from './ai-tools.service';
 import { behaviorDetectionService } from './behavior-detection.service';
@@ -152,6 +152,54 @@ export class AIService {
   }
 
   /**
+   * Build conversation context using a "head + tail" strategy to preserve
+   * both the opening of the conversation and recent context without blowing tokens.
+   * - Head: first 15 messages (how we started)
+   * - Tail: last 35 messages (recent context)
+   * - Total: up to 50 messages (beginning + recent)
+   * - Middle: when dropped, we add a lightweight "bridge" with topic snippets from user messages
+   * - If total <= 50, use all messages
+   */
+  private async getChatContextForModel(userId: string): Promise<{ messages: any[]; bridgeHint?: string }> {
+    const HEAD_SIZE = 15;
+    const TAIL_SIZE = 35;
+    const MAX_FETCH = 100;
+
+    const fullHistory = await postgresService.getChatHistory(userId, MAX_FETCH);
+    if (fullHistory.length <= HEAD_SIZE + TAIL_SIZE) {
+      return { messages: fullHistory };
+    }
+
+    const head = fullHistory.slice(0, HEAD_SIZE);
+    const tail = fullHistory.slice(-TAIL_SIZE);
+    const headIds = new Set(head.map((m) => m.id));
+    const tailDeduped = tail.filter((m) => !headIds.has(m.id));
+
+    // Build a lightweight bridge: first ~50 chars of each user message in the dropped middle (max ~400 chars total)
+    const middle = fullHistory.slice(HEAD_SIZE, fullHistory.length - TAIL_SIZE);
+    const SNIPPET_LEN = 50;
+    const BRIDGE_MAX = 400;
+    const parts: string[] = [];
+    for (const m of middle) {
+      if (m.role !== 'user' || !m.content?.trim()) continue;
+      const snip = (m.content as string).trim().slice(0, SNIPPET_LEN);
+      if (!snip) continue;
+      parts.push(snip + (snip.length >= SNIPPET_LEN ? '…' : ''));
+    }
+    let bridgeText = parts.join('; ');
+    if (bridgeText.length > BRIDGE_MAX) {
+      bridgeText = bridgeText.slice(0, BRIDGE_MAX - 3) + '…';
+    }
+    const bridgeHint =
+      bridgeText ? `[Earlier in the conversation, the user touched on: ${bridgeText}]` : undefined;
+
+    return {
+      messages: [...head, ...tailDeduped],
+      bridgeHint,
+    };
+  }
+
+  /**
    * Stream an Anthropic response via SSE.
    * Calls onChunk for each text delta, onDone when complete, onError on failure.
    * Falls back to the non-streaming Anthropic path if streaming is unavailable.
@@ -167,7 +215,7 @@ export class AIService {
     let activeBehaviorId = behaviorId;
 
     try {
-      const history = await postgresService.getChatHistory(userId, 10);
+      const { messages: history, bridgeHint } = await this.getChatContextForModel(userId);
 
       const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
       const explicitlySelectedBehavior =
@@ -193,12 +241,16 @@ export class AIService {
         // Memory fetch failure should not block chat
       }
 
-      const systemPrompt = memoryContext
+      let systemPrompt = memoryContext
         ? `${activeBehavior.instructions.systemPrompt}\n\n---USER CONTEXT---\n${memoryContext}\n---END USER CONTEXT---`
         : activeBehavior.instructions.systemPrompt;
+      if (bridgeHint) {
+        systemPrompt += `\n\n---CONVERSATION BRIDGE---\n${bridgeHint}\n---END BRIDGE---`;
+      }
 
       const client = getAnthropicClient();
-      const anthropicMessages = [
+      const anthropicTools = convertAiToolsToAnthropic(aiTools);
+      let anthropicMessages: any[] = [
         ...history.map((msg) => ({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
           content: msg.content,
@@ -215,27 +267,71 @@ export class AIService {
       });
 
       let fullText = '';
+      let finalMessage: any;
+      let maxToolRounds = 5;
 
-      const stream = await client.messages.stream({
-        model: ANTHROPIC_CONFIG.model,
-        max_tokens: ANTHROPIC_CONFIG.maxTokens,
-        system: systemPrompt,
-        messages: anthropicMessages as any,
-      });
+      do {
+        const stream = await client.messages.stream({
+          model: ANTHROPIC_CONFIG.model,
+          max_tokens: ANTHROPIC_CONFIG.maxTokens,
+          system: systemPrompt,
+          messages: anthropicMessages,
+          tools: anthropicTools,
+          tool_choice: { type: 'auto' as const },
+        });
 
-      for await (const event of stream) {
-        if (
-          event.type === 'content_block_delta' &&
-          (event.delta as any)?.type === 'text_delta' &&
-          (event.delta as any).text
-        ) {
-          const chunk: string = (event.delta as any).text;
-          fullText += chunk;
-          onChunk(chunk);
+        // Stream text deltas to client as they arrive (not batched at end)
+        stream.on('text', (textDelta: string) => {
+          if (textDelta) onChunk(textDelta);
+        });
+
+        finalMessage = await stream.finalMessage();
+
+        if (finalMessage.stop_reason !== 'tool_use') {
+          fullText =
+            (finalMessage.content as any[])
+              ?.filter((b: any) => b?.type === 'text')
+              ?.map((b: any) => b.text)
+              ?.join('\n')
+              ?.trim() || '';
+          break;
         }
-      }
+
+        const toolUseBlocks = (finalMessage.content as any[]).filter((b: any) => b?.type === 'tool_use');
+        if (toolUseBlocks.length === 0) break;
+
+        anthropicMessages.push({
+          role: 'assistant' as const,
+          content: finalMessage.content,
+        });
+
+        for (const block of toolUseBlocks) {
+          const toolName = block.name;
+          const toolInput = block.input ?? {};
+          let result: any;
+          try {
+            result = await aiToolsService.executeTool(toolName, toolInput, userId);
+          } catch (err: any) {
+            result = { error: err?.message || 'Tool execution failed' };
+          }
+          anthropicMessages.push({
+            role: 'user' as const,
+            content: [
+              {
+                type: 'tool_result' as const,
+                tool_use_id: block.id,
+                content: JSON.stringify(result),
+              },
+            ],
+          });
+        }
+      } while (finalMessage?.stop_reason === 'tool_use' && --maxToolRounds > 0);
 
       if (!fullText) fullText = "I'm here with you.";
+      // Text was streamed via stream.on('text'); only send fallback if we never got any text events
+      if (fullText === "I'm here with you.") {
+        onChunk(fullText);
+      }
 
       await postgresService.saveChatMessage({
         userId,
@@ -327,7 +423,7 @@ export class AIService {
     let activeBehaviorId = behaviorId;
 
     try {
-      const history = await postgresService.getChatHistory(userId, 10);
+      const { messages: history, bridgeHint } = await this.getChatContextForModel(userId);
 
       const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
       const explicitlySelectedBehavior =
@@ -362,12 +458,16 @@ export class AIService {
         // Memory fetch failure should not block chat
       }
 
-      const systemPrompt = memoryContext
+      let systemPrompt = memoryContext
         ? `${activeBehavior.instructions.systemPrompt}\n\n---USER CONTEXT---\n${memoryContext}\n---END USER CONTEXT---`
         : activeBehavior.instructions.systemPrompt;
+      if (bridgeHint) {
+        systemPrompt += `\n\n---CONVERSATION BRIDGE---\n${bridgeHint}\n---END BRIDGE---`;
+      }
 
       const client = getAnthropicClient();
-      const anthropicMessages = [
+      const anthropicTools = convertAiToolsToAnthropic(aiTools);
+      let anthropicMessages: any[] = [
         ...history.map((msg) => ({
           role: msg.role === 'assistant' ? 'assistant' : 'user',
           content: msg.content,
@@ -378,17 +478,59 @@ export class AIService {
         },
       ];
 
-      const completion = await client.messages.create({
-        model: ANTHROPIC_CONFIG.model,
-        max_tokens: ANTHROPIC_CONFIG.maxTokens,
-        system: systemPrompt,
-        messages: anthropicMessages as any,
-      });
+      const toolsUsed: string[] = [];
+      let completion: any;
+      let maxToolRounds = 5;
+
+      do {
+        completion = await client.messages.create({
+          model: ANTHROPIC_CONFIG.model,
+          max_tokens: ANTHROPIC_CONFIG.maxTokens,
+          system: systemPrompt,
+          messages: anthropicMessages,
+          tools: anthropicTools,
+          tool_choice: { type: 'auto' as const },
+        });
+
+        if (completion.stop_reason !== 'tool_use') break;
+
+        const toolUseBlocks = (completion.content as any[]).filter((b: any) => b?.type === 'tool_use');
+        if (toolUseBlocks.length === 0) break;
+
+        // Append assistant message with tool_use
+        anthropicMessages.push({
+          role: 'assistant' as const,
+          content: completion.content,
+        });
+
+        // Execute each tool and append results
+        for (const block of toolUseBlocks) {
+          const toolName = block.name;
+          const toolInput = block.input ?? {};
+          toolsUsed.push(toolName);
+          let result: any;
+          try {
+            result = await aiToolsService.executeTool(toolName, toolInput, userId);
+          } catch (err: any) {
+            result = { error: err?.message || 'Tool execution failed' };
+          }
+          anthropicMessages.push({
+            role: 'user' as const,
+            content: [
+              {
+                type: 'tool_result' as const,
+                tool_use_id: block.id,
+                content: JSON.stringify(result),
+              },
+            ],
+          });
+        }
+      } while (completion.stop_reason === 'tool_use' && --maxToolRounds > 0);
 
       const assistantMessage =
         ((completion.content as any[])
-          ?.filter((block) => block?.type === 'text')
-          ?.map((block) => block.text)
+          ?.filter((block: any) => block?.type === 'text')
+          ?.map((block: any) => block.text)
           ?.join('\n')
           ?.trim() as string) || "I'm here with you.";
 
@@ -409,12 +551,14 @@ export class AIService {
           behaviorName: activeBehavior.name,
           behaviorConfidence,
           matchedTriggers,
+          toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
         },
       });
 
       return {
         content: assistantMessage,
         role: 'assistant',
+        toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
         activeBehavior: activeBehavior.name,
       };
     } catch (error: any) {
@@ -466,8 +610,8 @@ export class AIService {
     let activeBehaviorId = behaviorId;
 
     try {
-      // Get chat history from Postgres
-      const history = await postgresService.getChatHistory(userId, 10);
+      // Get chat history from Postgres (head + tail for token efficiency)
+      const { messages: history, bridgeHint } = await this.getChatContextForModel(userId);
 
       const requestedBehavior = this.resolveRequestedBehaviorId(behaviorId);
       const explicitlySelectedBehavior =
@@ -510,6 +654,11 @@ export class AIService {
         },
       ];
 
+      let kimiSystemPrompt = activeBehavior.instructions.systemPrompt;
+      if (bridgeHint) {
+        kimiSystemPrompt += `\n\n---CONVERSATION BRIDGE---\n${bridgeHint}\n---END BRIDGE---`;
+      }
+
       const toolsUsed: string[] = [];
       let assistantMessage = '';
       let completion: any;
@@ -517,7 +666,7 @@ export class AIService {
       // Call Kimi API with tools and dynamic behavior system prompt
       completion = await this.callKimiWithRetry(
         messages,
-        activeBehavior.instructions.systemPrompt,
+        kimiSystemPrompt,
         aiTools,
         'initial'
       );
@@ -576,7 +725,7 @@ export class AIService {
         // Get next response from Kimi with tool results
         completion = await this.callKimiWithRetry(
           messages,
-          activeBehavior.instructions.systemPrompt,
+          kimiSystemPrompt,
           aiTools,
           'tool-followup'
         );

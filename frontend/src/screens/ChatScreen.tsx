@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -88,17 +88,21 @@ export const ChatScreen: React.FC = () => {
 
   const { speak, stop, isSpeaking, queueSpeak } = useTTS(selectedPersona);
 
-  const { messages, isLoading, sendMessage } = useChat(
-    selectedBehaviorId,
-    selectedPersona,
-    {
-      onSegment: (text, messageId) => {
-        // Mark as spoken so the end-of-stream auto-speak doesn't re-fire
+  const chatOptions = useMemo(
+    () => ({
+      onSegment: (text: string, messageId: string) => {
         spokenIdsRef.current.add(messageId);
         setSpeakingMessageId(messageId);
         queueSpeak(text);
       },
-    }
+    }),
+    [queueSpeak]
+  );
+
+  const { messages, isLoading, sendMessage } = useChat(
+    selectedBehaviorId,
+    selectedPersona,
+    chatOptions
   );
 
   // Clear speaking state when playback finishes
@@ -141,6 +145,14 @@ export const ChatScreen: React.FC = () => {
   }, [messages]);
 
   const [pendingInput, setPendingInput] = useState('');
+  const messagesListRef = useRef<FlatList>(null);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => messagesListRef.current?.scrollToEnd({ animated: true }), 80);
+    }
+  }, [messages.length, messages[messages.length - 1]?.content?.length]);
 
   const { isRecording, isTranscribing, startListening, stopListening } = usePTT({
     onTranscript: (text) => {
@@ -300,7 +312,9 @@ export const ChatScreen: React.FC = () => {
         )}
         <View style={styles.messagesPanel}>
           <FlatList
+            ref={messagesListRef}
             data={messages}
+            initialNumToRender={50}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ChatMessage
@@ -518,9 +532,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   messagesList: {
+    flexGrow: 1,
     paddingTop: 0,
     paddingHorizontal: 0,
-    paddingBottom: 0,
+    paddingBottom: 24,
   },
 });
 

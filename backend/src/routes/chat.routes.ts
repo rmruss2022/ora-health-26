@@ -4,7 +4,7 @@ import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
-// router.use(authenticateToken); // Disabled for testing
+router.use(authenticateToken);
 
 router.post('/messages', chatController.sendMessage);
 router.post('/stream', chatController.streamMessage);

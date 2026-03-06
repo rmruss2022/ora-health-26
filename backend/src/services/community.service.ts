@@ -97,6 +97,55 @@ export class CommunityService {
     }));
   }
 
+  async getPostsByUser(userId: string, limit = 10): Promise<CommunityPost[]> {
+    const queryText = `
+      SELECT
+        cp.id,
+        cp.user_id as "userId",
+        cp.author_name as "authorName",
+        cp.author_avatar as "authorAvatar",
+        cp.is_anonymous as "isAnonymous",
+        cp.type,
+        cp.category,
+        cp.content,
+        cp.prompt_text as "promptText",
+        cp.tags,
+        cp.likes_count as "likesCount",
+        cp.comments_count as "commentsCount",
+        cp.created_at as "createdAt",
+        EXISTS(
+          SELECT 1 FROM post_likes pl
+          WHERE pl.post_id = cp.id AND pl.user_id = $1
+        ) as "isLiked"
+      FROM community_posts cp
+      WHERE cp.user_id = $1
+      ORDER BY cp.created_at DESC
+      LIMIT $2
+    `;
+
+    const result = await query(queryText, [userId, limit]);
+
+    return result.rows.map(row => ({
+      id: row.id,
+      userId: row.userId,
+      author: {
+        name: row.isAnonymous ? 'Anonymous' : row.authorName,
+        avatar: row.authorAvatar,
+        isAnonymous: row.isAnonymous
+      },
+      type: row.type,
+      category: row.category,
+      content: row.content,
+      promptText: row.promptText,
+      tags: row.tags || [],
+      likes: row.likesCount,
+      comments: row.commentsCount,
+      timestamp: this.formatTimestamp(row.createdAt),
+      isLiked: row.isLiked,
+      createdAt: row.createdAt
+    }));
+  }
+
   async getCategories(): Promise<PostCategory[]> {
     const queryText = `
       SELECT

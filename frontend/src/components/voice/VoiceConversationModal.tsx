@@ -160,8 +160,8 @@ export const VoiceConversationModal: React.FC<VoiceConversationModalProps> = ({
     transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] }) }],
   });
 
-  // Show last 8 messages as transcript
-  const transcript = messages.slice(-8);
+  // Show last 30 messages as transcript (no hard cap)
+  const transcript = messages.slice(-30);
   const scrollRef = useRef<ScrollView>(null);
 
   // Auto-scroll to end when new messages arrive
