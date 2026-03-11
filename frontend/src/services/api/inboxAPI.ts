@@ -2,6 +2,40 @@ import { apiClient } from './apiClient';
 import type { InboxMessage } from '../../types';
 
 export class InboxAPI {
+  /** Get 3 daily letters from queue (for community Letters section). Falls back to getMessages if unavailable. */
+  async getDailyLetters(forDate?: string): Promise<{ messages: InboxMessage[]; unreadCount: number; totalCount: number }> {
+    try {
+      const query = forDate ? `?date=${forDate}` : '';
+      const response = await apiClient.get<any>(`/inbox/daily-letters${query}`);
+      const messages = response?.messages ?? [];
+      return {
+        messages,
+        unreadCount: messages.filter((m: InboxMessage) => !m.isRead).length,
+        totalCount: messages.length,
+      };
+    } catch {
+      return this.getMessages(false, 10, 0);
+    }
+  }
+
+  async markDailyLetterAsRead(dailyLetterId: string): Promise<{ success: boolean }> {
+    return apiClient.post(`/inbox/daily-letters/${dailyLetterId}/read`, {});
+  }
+
+  /** Respond to a daily letter (uses daily letter id, not inbox message id). */
+  async respondToDailyLetter(
+    dailyLetterId: string,
+    responseText: string,
+    createPost: boolean = false,
+    isAnonymous: boolean = false
+  ): Promise<{ success: boolean; postId?: string }> {
+    return apiClient.post(`/inbox/daily-letters/${dailyLetterId}/respond`, {
+      responseText,
+      createPost,
+      isAnonymous
+    });
+  }
+
   async getMessages(
     unreadOnly: boolean = false,
     limit: number = 20,

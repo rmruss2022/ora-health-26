@@ -1,4 +1,5 @@
 import { query } from '../config/database';
+import { letterQueueService } from './letter-queue.service';
 
 export interface CommunityPost {
   id: string;
@@ -259,6 +260,18 @@ export class CommunityService {
     ]);
 
     const row = result.rows[0];
+    try {
+      await letterQueueService.addToQueue({
+        sourcePostId: row.id,
+        sourceType: 'community_post',
+        subject: (data.promptText || data.content).slice(0, 100),
+        content: data.content,
+        authorUserId: userId,
+        messageType: data.category || 'encouragement',
+      });
+    } catch (e) {
+      console.warn('[Community] Failed to add post to letter queue:', (e as Error)?.message);
+    }
     return {
       id: row.id,
       userId: row.userId,

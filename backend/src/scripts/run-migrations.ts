@@ -15,6 +15,8 @@ const migrations = [
   '004_create_user_profiles.sql',
   '004_pgvector_setup.sql',
   '005_threaded_comments.sql',
+  '014_letter_queue_and_daily_letters.sql',
+  '015_letter_queue_author_name.sql',
 ];
 
 async function runMigrations() {

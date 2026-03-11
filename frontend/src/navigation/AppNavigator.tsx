@@ -13,6 +13,7 @@ import { CommunityScreen } from '../screens/CommunityScreen';
 import { CommentsScreen } from '../screens/CommentsScreen';
 import { CreatePostScreen } from '../screens/CreatePostScreen';
 import { LetterDetailScreen } from '../screens/LetterDetailScreen';
+import { LetterInboxListScreen } from '../screens/LetterInboxListScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -65,6 +66,7 @@ function CommunityStackNavigator() {
       <CommunityStack.Screen name="CommunityHome" component={CommunityScreen} />
       <CommunityStack.Screen name="Comments" component={CommentsScreen} />
       <CommunityStack.Screen name="CreatePost" component={CreatePostScreen} />
+      <CommunityStack.Screen name="LetterInboxList" component={LetterInboxListScreen} />
       <CommunityStack.Screen name="LetterDetail" component={LetterDetailScreen} />
     </CommunityStack.Navigator>
   );

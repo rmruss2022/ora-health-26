@@ -64,6 +64,7 @@ export interface InboxMessage {
   messageType: 'prompt' | 'encouragement' | 'activity_suggestion' | 'insight' | 'community_highlight';
   subject?: string;
   content: string;
+  authorName?: string;
   metadata?: Record<string, any>;
   isRead: boolean;
   isArchived: boolean;
@@ -71,6 +72,8 @@ export interface InboxMessage {
   archivedAt?: string;
   timestamp: string;
   createdAt: Date | string;
+  /** True when from daily letters queue (use markDailyLetterAsRead) */
+  isDailyLetter?: boolean;
 }
 
 export interface PostCategory {

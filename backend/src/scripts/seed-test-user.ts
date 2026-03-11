@@ -199,7 +199,48 @@ async function seed() {
      VALUES ($1, 'prompt', 'What felt most alive this week?', 'Take a moment to reflect: what moment or experience made you feel most alive or present this week?', '{}', false, NOW())`,
     [userId]
   );
-  console.log('✅ inbox_messages (weekly-plan, weekly-review, prompt)');
+
+  // 3 letter-style messages for today (community Letters section)
+  const todayLetters = [
+    { type: 'encouragement', subject: 'A gentle reminder', content: 'Small acts done consistently can shift your whole week. Keep showing up for yourself.', isRead: false },
+    { type: 'insight', subject: 'Community insight', content: 'Most members who complete 5-minute sessions report feeling calmer by day three. You\'re in good company.', isRead: false },
+    { type: 'community_highlight', subject: 'From the circle', content: '"I no longer wait for motivation. I just begin with one mindful breath." — shared by a member this week.', isRead: false },
+  ];
+  for (const l of todayLetters) {
+    await query(
+      `INSERT INTO inbox_messages (user_id, message_type, subject, content, metadata, is_read, created_at)
+       VALUES ($1, $2, $3, $4, '{"daily_letter": true}', $5, NOW())`,
+      [userId, l.type, l.subject, l.content, l.isRead]
+    );
+  }
+  console.log('✅ inbox_messages (weekly-plan, weekly-review, prompt, 3 letters for today)');
+
+  // ─── 7b. LETTER QUEUE (for daily letters system) ─────────────────────────────
+  try {
+    await query(`DELETE FROM user_daily_letters WHERE user_id = $1`, [userId]);
+    await query(`DELETE FROM user_letter_reads WHERE user_id = $1`, [userId]);
+
+    const queueCount = await query(`SELECT COUNT(*) as c FROM letter_queue`);
+    if (parseInt(queueCount.rows[0]?.c || '0', 10) === 0) {
+      const queueLetters = [
+        { subject: 'I wanted to share how meditation helped me', author: 'Mira', content: "I've been doing 5 minutes of box breathing before my coffee for two weeks now. At first it felt silly, but something shifted. I notice I'm less reactive in the first hour of the day. My partner even asked what I'm doing differently. If you're curious, start with just 3 breaths — that's how I began.", type: 'community_highlight' },
+        { subject: 'From K.: This week I noticed something', author: 'Kai', content: "I missed my practice for a full week when work got chaotic. Instead of guilt, I tried to just notice what felt different. My sleep was worse. I snapped at small things. Coming back felt like coming home. The break taught me why I show up — not from obligation, but because it actually helps.", type: 'insight' },
+        { subject: 'I wanted to share a small win', author: 'Jordan', content: "Yesterday I caught myself before spiraling. Something at work triggered me and I felt the old pattern kick in. This time I paused, did 4 breaths, and asked myself: what do I need right now? I took a walk. It wasn't perfect but it was different. Progress feels like this sometimes.", type: 'encouragement' },
+        { subject: "From S.: What I'm grateful for", author: 'Sam', content: "I've been reading the letters here for a while and finally writing one. What I'm grateful for: people who share the messy middle, not just the wins. It helps to know I'm not the only one who forgets, restarts, and keeps trying. Thank you for that.", type: 'community_highlight' },
+        { subject: 'I wanted to share what helped my sleep', author: 'Alex', content: "I used to scroll until I passed out. Now I do 10 minutes of gentle stretching, then 5 minutes of body scan. It sounds simple but it's changed how I fall asleep. I'm sharing in case someone else is stuck in the same loop.", type: 'insight' },
+        { subject: "From R.: On reaching out when I'm struggling", author: 'Riley', content: "I used to think mindfulness was something you do alone. This community showed me otherwise. Reaching out when I'm struggling — even in a small way — has been its own practice. If you're holding something in, maybe this is your sign to share it.", type: 'encouragement' },
+      ];
+      for (const l of queueLetters) {
+        await query(
+          `INSERT INTO letter_queue (subject, content, message_type, source_type, author_name) VALUES ($1, $2, $3, 'manual', $4)`,
+          [l.subject, l.content, l.type, l.author]
+        );
+      }
+      console.log('✅ letter_queue (6 seed letters)');
+    }
+  } catch (e) {
+    console.log('⚠️  letter_queue tables may not exist — run migration 014 first');
+  }
 
   // ─── 8. WEEKLY_PLANS & WEEKLY_REVIEWS tables (agent-memory, other services) ─
   try {

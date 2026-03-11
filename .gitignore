@@ -49,4 +49,7 @@ assets/*-with-bg.png
 
 # local Cursor MCP config (contains local secrets)
 .cursor/mcp.json
+
+# database backups (contain data)
+db-backups/
 meditation-sounds/

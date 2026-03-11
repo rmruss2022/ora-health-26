@@ -1,118 +1,108 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../theme';
 import { InboxMessage } from '../../types';
 
-interface LetterViewProps {
-  letter: InboxMessage;
-}
-
-const MESSAGE_TYPE_LABELS: Record<string, string> = {
-  prompt: 'Ora',
-  encouragement: 'Ora',
-  activity_suggestion: 'Ora',
-  insight: 'Ora',
-  community_highlight: 'Community',
+const AUTHOR_LABELS: Record<string, string> = {
+  community_highlight: 'From the circle',
+  insight: 'A member',
+  encouragement: 'From the circle',
+  prompt: 'A member',
+  activity_suggestion: 'From the circle',
 };
 
 /**
- * LetterView - Full letter reading view
- *
- * Layout (matching letter.png reference):
- * - Metadata row: author name (left) / posted date (right)
- * - Full letter content below
+ * LetterView - Full letter reading view with Ora design
+ * Letters are from community members describing their experience; readers can respond inline.
  */
-export const LetterView: React.FC<LetterViewProps> = ({ letter }) => {
-  const authorLabel = MESSAGE_TYPE_LABELS[letter.messageType] ?? 'Ora';
+export const LetterView: React.FC<{ letter: InboxMessage }> = ({ letter }) => {
+  const authorLabel = letter.authorName || AUTHOR_LABELS[letter.messageType] || 'A community member';
   const dateLabel = letter.timestamp || 'Recently';
   const body = letter.content;
   const subject = letter.subject;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.paper}>
-        {/* Metadata row: author left / date right */}
-        <View style={styles.metaRow}>
-          <Text style={styles.authorName}>{authorLabel}</Text>
+    <View style={styles.container}>
+      <View style={styles.card}>
+        {/* Author row */}
+        <View style={styles.authorRow}>
+          <View style={styles.authorPill}>
+            <Text style={styles.authorLabel}>{authorLabel}</Text>
+          </View>
           <Text style={styles.dateText}>{dateLabel}</Text>
         </View>
 
         {/* Divider */}
         <View style={styles.divider} />
 
-        {/* Subject (if present) */}
-        {subject ? <Text style={styles.subject}>{subject}</Text> : null}
+        {/* Subject */}
+        {subject ? (
+          <Text style={styles.subject}>{subject}</Text>
+        ) : null}
 
-        {/* Full letter body */}
+        {/* Letter body */}
         <Text style={styles.body}>{body}</Text>
       </View>
-
-      <View style={styles.bottomSpacer} />
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: theme.colors.backgroundLight,
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
   },
-  contentContainer: {
-    padding: 16,
-  },
-  paper: {
-    backgroundColor: theme.colors.cream ?? '#F5F1E8',
-    borderRadius: 12,
+  card: {
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.colors.border ?? '#E0DCD3',
-    padding: 24,
-    paddingVertical: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderColor: 'rgba(163,163,163,0.3)',
+    padding: theme.spacing.xl,
+    backgroundColor: '#FFFDF9',
+    ...theme.shadows.md,
   },
-  metaRow: {
+  authorRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
   },
-  authorName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-    fontFamily: 'Switzer-Medium',
+  authorPill: {
+    backgroundColor: 'rgba(212,184,232,0.22)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(212,184,232,0.5)',
+  },
+  authorLabel: {
+    fontFamily: 'Switzer-Semibold',
+    fontSize: 11,
+    color: '#6B5B95',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   dateText: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
     fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: theme.colors.textTertiary,
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.border ?? '#E0DCD3',
-    marginBottom: 20,
+    backgroundColor: 'rgba(163,163,163,0.18)',
+    marginBottom: theme.spacing.lg,
   },
   subject: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Sentient-Light',
+    fontSize: 23,
     color: theme.colors.textPrimary,
-    marginBottom: 12,
-    fontFamily: 'Sentient-Regular',
+    marginBottom: theme.spacing.lg,
+    lineHeight: 31,
+    letterSpacing: 0.1,
   },
   body: {
-    fontSize: 16,
-    lineHeight: 26,
+    fontFamily: 'Sentient-LightItalic',
+    fontSize: 17,
+    lineHeight: 29,
     color: theme.colors.textPrimary,
-    fontFamily: 'Sentient-Regular',
-  },
-  bottomSpacer: {
-    height: 32,
   },
 });

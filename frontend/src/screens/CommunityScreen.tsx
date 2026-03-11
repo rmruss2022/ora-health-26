@@ -7,14 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
-  LayoutAnimation,
-  Platform,
-  UIManager,
 } from 'react-native';
-
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
@@ -128,17 +121,7 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
   const [postsPage, setPostsPage] = useState(0);
   const [hasMorePosts, setHasMorePosts] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [openedLetters, setOpenedLetters] = useState<Set<string>>(
-    new Set(letters.filter(l => l.isRead).map(l => l.id))
-  );
-
   const PAGE_SIZE = 10;
-
-  const handleLetterPress = (message: InboxMessage) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setOpenedLetters(prev => new Set(prev).add(message.id));
-    navigation.navigate('LetterDetail', { letter: message });
-  };
 
   useEffect(() => {
     loadLetters();
@@ -149,11 +132,16 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
 
   const loadLetters = async () => {
     try {
-      const result = await inboxAPI.getMessages(false, 4, 0);
+      const result = await inboxAPI.getDailyLetters();
       setLetters(result.messages.length > 0 ? result.messages : FALLBACK_LETTERS);
     } catch (error) {
       console.error('Error loading letters:', error);
-      setLetters(FALLBACK_LETTERS);
+      try {
+        const fallback = await inboxAPI.getMessages(false, 10, 0);
+        setLetters(fallback.messages.length > 0 ? fallback.messages : FALLBACK_LETTERS);
+      } catch {
+        setLetters(FALLBACK_LETTERS);
+      }
     }
   };
 
@@ -278,52 +266,29 @@ export const CommunityScreen: React.FC<CommunityScreenProps> = ({ navigation }) 
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.sectionContainer}>
-          {/* Letters header: "Letters" pill + "Inbox" pill */}
-          <View style={styles.lettersSectionHeader}>
-            <Text style={styles.circleTitle}>Letters</Text>
-            <TouchableOpacity
-              style={styles.inboxPill}
-              onPress={() => navigation.navigate('LetterDetail', {
-                letter: letters.find(l => l.isRead) || letters[0],
-              })}
-              activeOpacity={0.75}
+          <Text style={styles.circleTitle}>Letters</Text>
+          <TouchableOpacity
+            style={styles.letterEntryCard}
+            onPress={() => navigation.navigate('LetterInboxList')}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#1d473e', '#2d5e52']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.letterGradient}
             >
-              <Text style={styles.inboxPillText}>Inbox</Text>
-            </TouchableOpacity>
-          </View>
-          {(() => {
-            const currentLetter = letters.find(l => !openedLetters.has(l.id));
-            if (!currentLetter) {
-              return (
-                <View style={styles.emptyInlineCard}>
-                  <Text style={styles.emptyInlineText}>You're all caught up.</Text>
-                </View>
-              );
-            }
-            return (
-              <TouchableOpacity
-                style={styles.letterCard}
-                onPress={() => handleLetterPress(currentLetter)}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#2D6A4F', '#52B788']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.inboxGradientContainer}
-                >
-                  <Image
-                    source={require('../../assets/icons/letter-sealed.jpg')}
-                    style={styles.letterEnvelopeIcon}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.letterSubject}>
-                    {currentLetter.subject || 'Letter'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            );
-          })()}
+              <Image
+                source={require('../../assets/icons/letter-sealed.jpg')}
+                style={styles.letterEnvelopeIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.letterSubject}>
+                {letters.length > 0 ? letters.find(l => !l.isRead)?.subject || letters[0]?.subject || 'Letters from the circle' : 'Letters from the circle'}
+              </Text>
+              <Text style={styles.letterHint}>Read and respond</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.promptBanner} activeOpacity={0.8}>
             <View style={styles.promptIconContainer}>
@@ -422,7 +387,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF8F3',
   },
   loadingText: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#8A8A8A',
     marginTop: 16,
@@ -449,14 +414,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerTitle: {
-    fontFamily: 'System',
+    fontFamily: 'Sentient-Light',
     fontSize: 28,
-    fontWeight: '300',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     color: '#2D2D2D',
   },
   headerSubtitle: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#8A8A8A',
     marginTop: 2,
@@ -475,9 +439,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   logoutText: {
+    fontFamily: 'Switzer-Regular',
     fontSize: 13,
     color: '#8A8A8A',
-    fontWeight: '500',
   },
   newPostButton: {
     minWidth: 68,
@@ -508,31 +472,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     backgroundColor: 'transparent',
   },
-  inboxGradientContainer: {
+  letterGradient: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
+    padding: 20,
+    paddingVertical: 24,
     borderRadius: 20,
-  },
-  lettersSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  inboxPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 184, 232, 0.6)',
-    backgroundColor: 'rgba(212, 184, 232, 0.15)',
-  },
-  inboxPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.lavender,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   circleTitle: {
     fontSize: 13,
@@ -549,36 +494,33 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignSelf: 'flex-start',
   },
-  letterCard: {
+  letterEntryCard: {
     backgroundColor: 'transparent',
     borderRadius: 20,
     borderWidth: 0,
     marginBottom: 10,
   },
+  letterHint: {
+    fontFamily: 'Switzer-Regular',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 6,
+    letterSpacing: 0.3,
+  },
   letterEnvelopeIcon: {
-    width: 110,
-    height: 110,
-    borderRadius: 16,
-    marginBottom: 14,
+    width: 80,
+    height: 80,
+    borderRadius: 14,
+    marginBottom: 16,
+    opacity: 0.95,
   },
   letterSubject: {
     fontFamily: 'Sentient-LightItalic',
-    fontSize: 16,
-    color: '#2D2D2D',
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.95)',
     textAlign: 'center',
     letterSpacing: 0.2,
-  },
-  emptyInlineCard: {
-    backgroundColor: 'transparent',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(163,163,163,0.35)',
-    padding: 16,
-  },
-  emptyInlineText: {
-    fontFamily: 'System',
-    fontSize: 14,
-    color: '#8A8A8A',
+    lineHeight: 24,
   },
   promptBanner: {
     flexDirection: 'row',
@@ -606,18 +548,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   promptLabel: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Semibold',
     fontSize: 11,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: '#1d473e',
     marginBottom: 2,
-    fontWeight: '600',
   },
   promptText: {
-    fontFamily: 'System',
+    fontFamily: 'Sentient-Light',
     fontSize: 15,
     color: '#2D2D2D',
+    lineHeight: 21,
   },
   promptArrow: {
     fontSize: 24,
@@ -633,18 +575,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
-    fontFamily: 'System',
-    fontSize: 20,
-    fontWeight: '300',
+    fontFamily: 'Sentient-Light',
+    fontSize: 22,
     color: '#2D2D2D',
     marginBottom: 8,
   },
   emptyText: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Regular',
     fontSize: 14,
     color: '#8A8A8A',
     textAlign: 'center',
     marginBottom: 20,
+    lineHeight: 20,
   },
   emptyButton: {
     backgroundColor: '#1d473e',
@@ -653,23 +595,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   emptyButtonText: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Semibold',
     fontSize: 14,
     color: '#FFFFFF',
-    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   loadMoreButton: {
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(163,163,163,0.4)',
+    borderColor: 'rgba(163,163,163,0.35)',
     borderRadius: 14,
     marginBottom: 12,
   },
   loadMoreText: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Semibold',
     fontSize: 14,
-    fontWeight: '600',
     color: theme.colors.lavender,
     letterSpacing: 0.2,
   },
@@ -688,9 +629,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   writePostText: {
-    fontFamily: 'System',
+    fontFamily: 'Switzer-Semibold',
     fontSize: 15,
-    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },
